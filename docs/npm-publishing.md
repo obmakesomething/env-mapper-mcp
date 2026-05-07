@@ -1,21 +1,21 @@
 # npm Publishing
 
-Env Mapper MCP is prepared for npm distribution, but the first publish is a
-human gate. Publishing creates an irreversible package/version record on the
-registry, so do not run the publish step until the maintainer has confirmed the
-package name, npm account, authentication state, and release tag.
+Env Mapper MCP is published on npm. Publishing creates an irreversible
+package/version record on the registry, so every future release still needs a
+reviewed tag, a dry run, and maintainer confirmation before `dry_run=false`.
 
 ## Package Name
 
-Candidate package:
+Package:
 
 ```bash
 env-mapper-mcp
 ```
 
-As of 2026-05-07, `npm view env-mapper-mcp version` returns `E404`, so there is
-no public package by this name visible from this machine. Re-check immediately
-before the first publish.
+As of 2026-05-07, `env-mapper-mcp@0.1.0` is public on npm:
+
+- package: <https://www.npmjs.com/package/env-mapper-mcp>
+- release: <https://github.com/obmakesomething/env-mapper-mcp/releases/tag/v0.1.0>
 
 ## Local Release Checks
 
@@ -42,11 +42,10 @@ or secret values.
 
 ## Trusted Publishing
 
-Use npm trusted publishing instead of a long-lived automation token when
-possible. npm's `npm trust` command requires the package to already exist on the
-registry, so the very first unscoped public package publish may need to be a
-maintainer-authenticated local publish. After `env-mapper-mcp@0.1.0` exists,
-configure the npm package trusted publisher to match:
+Use npm trusted publishing instead of a long-lived automation token. npm's
+`npm trust` command requires the package to already exist on the registry, so
+`env-mapper-mcp@0.1.0` was published through maintainer-authenticated local
+publish first. Trusted publishing is now configured for future releases with:
 
 - provider: GitHub Actions
 - owner: `obmakesomething`
@@ -73,7 +72,10 @@ References checked on 2026-05-07:
 - <https://docs.npmjs.com/cli/v11/commands/npm-trust/>
 - <https://docs.npmjs.com/cli/v11/configuring-npm/package-json>
 
-## First Publish Flow
+## Historical First Publish Flow
+
+The first publish has completed. Keep this record so maintainers can understand
+the bootstrap sequence that created `env-mapper-mcp@0.1.0`.
 
 1. Confirm the package name is still available:
 
@@ -128,10 +130,9 @@ References checked on 2026-05-07:
    npm view env-mapper-mcp version
    ```
 
-## Future Trusted-Publishing Flow
+## Trusted-Publishing Release Flow
 
-After trusted publishing is configured, future releases should use the GitHub
-workflow instead of a local publish:
+Future releases should use the GitHub workflow instead of a local publish:
 
 1. Create and push a reviewed release tag.
 2. Run the `Publish npm package` workflow with `dry_run=true` on the tag ref.

@@ -42,11 +42,10 @@ Requirements:
 - Node.js 20+
 - no runtime package install required
 
-The first npm publish is prepared but not yet run. After the first release is
-published, use the package directly:
+Run the published package directly:
 
 ```bash
-npx --package env-mapper-mcp env-mapper scan --root /path/to/repo --emit all --format json
+npx -p env-mapper-mcp env-mapper scan --root /path/to/repo --emit all --format json
 ```
 
 Or install the CLI:
@@ -129,7 +128,7 @@ Example client command:
 }
 ```
 
-From a source checkout before the npm package is published, use:
+When developing from a source checkout, use:
 
 ```json
 {
