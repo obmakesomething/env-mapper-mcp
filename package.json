@@ -13,7 +13,7 @@
     "url": "https://github.com/obmakesomething/env-mapper-mcp/issues"
   },
   "bin": {
-    "env-mapper": "./src/cli.js"
+    "env-mapper": "src/cli.js"
   },
   "scripts": {
     "scan": "node src/cli.js scan",
