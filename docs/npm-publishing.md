@@ -3,7 +3,7 @@
 Env Mapper MCP is prepared for npm distribution, but the first publish is a
 human gate. Publishing creates an irreversible package/version record on the
 registry, so do not run the publish step until the maintainer has confirmed the
-package name, npm account, trusted publisher settings, and release tag.
+package name, npm account, authentication state, and release tag.
 
 ## Package Name
 
@@ -43,7 +43,10 @@ or secret values.
 ## Trusted Publishing
 
 Use npm trusted publishing instead of a long-lived automation token when
-possible. Configure the npm package trusted publisher to match:
+possible. npm's `npm trust` command requires the package to already exist on the
+registry, so the very first unscoped public package publish may need to be a
+maintainer-authenticated local publish. After `env-mapper-mcp@0.1.0` exists,
+configure the npm package trusted publisher to match:
 
 - provider: GitHub Actions
 - owner: `obmakesomething`
@@ -57,16 +60,20 @@ npm can use OIDC when `dry_run` is set to `false`.
 Current npm trusted publishing requirements checked on 2026-05-07:
 
 - npm CLI `11.5.1` or newer
+- npm CLI `11.10.0` or newer for the `npm trust` command
 - Node.js `22.14.0` or newer
+- package already exists on the npm registry for `npm trust`
+- npm account has package write access and account-level 2FA enabled
 - GitHub-hosted runners for GitHub Actions trusted publishing
 - public repository and public package for automatic provenance
 
 References checked on 2026-05-07:
 
 - <https://docs.npmjs.com/trusted-publishers>
+- <https://docs.npmjs.com/cli/v11/commands/npm-trust/>
 - <https://docs.npmjs.com/cli/v11/configuring-npm/package-json>
 
-## Manual Publish Flow
+## First Publish Flow
 
 1. Confirm the package name is still available:
 
@@ -82,24 +89,56 @@ References checked on 2026-05-07:
    git push origin "v${VERSION}"
    ```
 
-3. Create a GitHub Release for the tag.
+3. Open the `Publish npm package` workflow manually.
 
-4. Open the `Publish npm package` workflow manually.
+4. Run the workflow with:
 
-5. Run once with `dry_run=true`. The default `release_ref=refs/heads/main`
-   is enough for a workflow smoke test; use the release tag ref for a final
-   pre-publish dry run.
-
-6. After the dry run passes and npm trusted publisher settings are confirmed,
-   run again with:
-
-   - `dry_run=false`
+   - `dry_run=true`
    - `release_ref=refs/tags/v<package-version>`
 
-7. Verify the package and provenance:
+   This validates the release tag, tests, build check, and package payload
+   without publishing.
+
+5. Run a local dry run:
+
+   ```bash
+   npm publish --dry-run --access public
+   ```
+
+6. If the package still does not exist and npm authentication is ready, publish
+   the first version locally:
+
+   ```bash
+   npm publish --access public
+   ```
+
+7. Create a GitHub Release for the tag.
+
+8. Configure trusted publishing for future releases through npm package settings
+   or npm CLI:
+
+   ```bash
+   npm install -g "npm@^11.10.0"
+   npm trust github env-mapper-mcp --repo obmakesomething/env-mapper-mcp --file publish.yml
+   ```
+
+9. Verify the package:
 
    ```bash
    npm view env-mapper-mcp version
+   ```
+
+## Future Trusted-Publishing Flow
+
+After trusted publishing is configured, future releases should use the GitHub
+workflow instead of a local publish:
+
+1. Create and push a reviewed release tag.
+2. Run the `Publish npm package` workflow with `dry_run=true` on the tag ref.
+3. Re-run with `dry_run=false` on the same `refs/tags/v<package-version>` ref.
+4. Verify package provenance:
+
+   ```bash
    npm audit signatures
    ```
 
