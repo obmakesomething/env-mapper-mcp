@@ -1,0 +1,66 @@
+name: Publish npm package
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate and pack without publishing.
+        required: true
+        default: true
+        type: boolean
+      tag:
+        description: npm dist-tag to apply when publishing.
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+          - next
+      release_ref:
+        description: Git ref to validate. Publishing requires a tag ref like refs/tags/v0.1.0.
+        required: true
+        default: refs/heads/main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install trusted-publishing capable npm
+        run: npm install --global "npm@^11.5.1"
+
+      - run: npm test
+
+      - run: npm run build
+
+      - run: npm run pack:check
+
+      - name: Verify release tag ref
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          case "${{ inputs.release_ref }}" in
+            refs/tags/v*) ;;
+            *) echo "release_ref must be a version tag ref like refs/tags/v0.1.0" >&2; exit 1 ;;
+          esac
+          test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "${{ inputs.release_ref }}")"
+
+      - name: Publish to npm
+        if: ${{ inputs.dry_run == false }}
+        run: npm publish --access public --tag "${{ inputs.tag }}"
+
+      - name: Dry-run notice
+        if: ${{ inputs.dry_run != false }}
+        run: echo "Dry run complete. Re-run with dry_run=false after trusted publisher settings are confirmed."

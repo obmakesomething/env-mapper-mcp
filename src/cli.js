@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { formatEmission } from "./format.js";
 import { startMcpServer, runCliScan } from "./mcp-server.js";
 
@@ -7,10 +9,10 @@ const USAGE = `Usage:
   env-mapper mcp
 
 Examples:
-  node src/cli.js scan --root . --emit all --format json
-  node src/cli.js scan --root . --emit dmno --format text
-  node src/cli.js scan --root . --emit llm --format json
-  node src/cli.js mcp
+  env-mapper scan --root . --emit all --format json
+  env-mapper scan --root . --emit dmno --format text
+  env-mapper scan --root . --emit llm --format json
+  env-mapper mcp
 `;
 
 export function main(argv = process.argv.slice(2)) {
@@ -67,7 +69,16 @@ function requireValue(args, index, flag) {
   return value;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+function isDirectInvocation() {
+  if (!process.argv[1]) return false;
+  try {
+    return fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(process.argv[1]);
+  } catch {
+    return fileURLToPath(import.meta.url) === process.argv[1];
+  }
+}
+
+if (isDirectInvocation()) {
   try {
     process.exitCode = main();
   } catch (error) {

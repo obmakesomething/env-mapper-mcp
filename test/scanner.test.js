@@ -11,6 +11,7 @@ import { generateSecretPlan } from "../src/generate-plan.js";
 import { scanRepository } from "../src/scanner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(__dirname, "..");
 const fixtureRoot = path.join(__dirname, "fixtures", "basic");
 
 test("scanner maps usage, declarations, and provider references without values", () => {
@@ -186,7 +187,7 @@ test("scan cli emits redacted output", () => {
     process.execPath,
     ["src/cli.js", "scan", "--root", fixtureRoot, "--emit", "all", "--format", "json"],
     {
-      cwd: path.join(__dirname, ".."),
+      cwd: repoRoot,
       encoding: "utf8"
     }
   );
@@ -199,6 +200,26 @@ test("scan cli emits redacted output", () => {
   assert.equal(output.report.totals.variables, 5);
   assert.equal(output.plan.mode, "dry-run");
   assert.equal(output.llm.mode, "redacted-llm-review-packet");
+});
+
+test("scan cli runs through an npm-style bin symlink", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-bin-"));
+  const binPath = path.join(tempDir, "env-mapper");
+  fs.symlinkSync(path.join(repoRoot, "src", "cli.js"), binPath);
+
+  const result = spawnSync(
+    process.execPath,
+    [binPath, "scan", "--root", fixtureRoot, "--emit", "report", "--format", "text"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Env Mapper report/);
+  assert.match(result.stdout, /MISSING_API_TOKEN/);
+  assert.equal(result.stdout.includes("postgres://"), false);
 });
 
 test("llm packet includes dynamic env access review candidates", () => {
@@ -235,7 +256,7 @@ test("scan cli exits non-zero for missing root", () => {
     process.execPath,
     ["src/cli.js", "scan", "--root", path.join(os.tmpdir(), "env-mapper-definitely-missing")],
     {
-      cwd: path.join(__dirname, ".."),
+      cwd: repoRoot,
       encoding: "utf8"
     }
   );
@@ -272,7 +293,7 @@ test("mcp stdio exposes scan tool without leaking raw env values", () => {
     .join("\n");
 
   const result = spawnSync(process.execPath, ["src/cli.js", "mcp"], {
-    cwd: path.join(__dirname, ".."),
+    cwd: repoRoot,
     input,
     encoding: "utf8"
   });
@@ -313,7 +334,7 @@ test("mcp stdio exposes redacted llm packet", () => {
     .join("\n");
 
   const result = spawnSync(process.execPath, ["src/cli.js", "mcp"], {
-    cwd: path.join(__dirname, ".."),
+    cwd: repoRoot,
     input,
     encoding: "utf8"
   });
