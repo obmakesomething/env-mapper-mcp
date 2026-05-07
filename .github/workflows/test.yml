@@ -1,0 +1,37 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  node-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node --test test/*.test.js
+      - run: node src/cli.js scan --root test/fixtures/basic --emit all --format json > /tmp/env-mapper-cli-all.json
+
+  action-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - id: env-audit
+        uses: ./
+        with:
+          root: test/fixtures/basic
+          output: env-mapper-audit.md
+      - name: Verify redacted action output
+        run: |
+          test -s env-mapper-audit.md
+          grep -q "Env Mapper MCP audit" env-mapper-audit.md
+          grep -q "MISSING_API_TOKEN" env-mapper-audit.md
+          ! grep -q "postgres://" env-mapper-audit.md
+          ! grep -q "sk_test_secret_value" env-mapper-audit.md

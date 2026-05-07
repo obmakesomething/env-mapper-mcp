@@ -66,6 +66,34 @@ The server implements the MCP stdio JSON-RPC lifecycle directly so the project
 remains usable without package-manager setup. Future releases can swap in the
 official SDK while keeping the same internal scanner contract.
 
+## GitHub Action
+
+Use the bundled action to add a redacted env audit to pull request workflow
+summaries:
+
+```yaml
+name: Env audit
+
+on:
+  pull_request:
+
+jobs:
+  env-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: your-org/env-mapper-mcp@v0
+        with:
+          root: .
+```
+
+The action writes to `GITHUB_STEP_SUMMARY` when available and sets a `markdown`
+output for PR comments through `actions/github-script` or `gh pr comment`. See
+[docs/github-action.md](docs/github-action.md) for copy-paste PR comment
+workflows.
+
 ## What It Detects Today
 
 Code usage:
