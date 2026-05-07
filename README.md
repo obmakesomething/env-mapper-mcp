@@ -100,9 +100,13 @@ Code usage:
 
 - `process.env.KEY`
 - `process.env["KEY"]`
+- `process.env[KEY]` (when KEY is dynamic, this is reported as `dynamic-usage` for review)
 - `import.meta.env.KEY`
+- `import.meta.env[KEY]` (dynamic forms are review candidates)
 - `Deno.env.get("KEY")`
+- `Deno.env.get(VAR)` (dynamic forms are review candidates)
 - `Bun.env.KEY`
+- `Bun.env[KEY]` (dynamic forms are review candidates)
 
 Config and docs references:
 
@@ -140,7 +144,7 @@ pattern.
 ## Roadmap
 
 - TypeScript package build once package manager setup is available.
-- AST-backed scanners for JS/TS, Python, Go, and Rust.
+- Deeper language-aware scanners for JS/TS, Python, Go, and Rust.
 - DMNO monorepo service graph generation.
 - Infisical MCP integration for key metadata CRUD in dry-run and approved apply
   modes.

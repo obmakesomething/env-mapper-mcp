@@ -5,6 +5,12 @@ export const DEFAULT_IGNORE_DIRS = new Set([
   ".hg",
   ".svn",
   "node_modules",
+  ".venv",
+  "venv",
+  ".tox",
+  ".pytest_cache",
+  ".mypy_cache",
+  "__pycache__",
   "dist",
   "build",
   "coverage",
@@ -12,6 +18,7 @@ export const DEFAULT_IGNORE_DIRS = new Set([
   ".nuxt",
   ".turbo",
   ".cache",
+  ".codex-artifacts",
   "vendor",
   "worktrees"
 ]);
@@ -39,4 +46,3 @@ export const TEXT_EXTENSIONS = new Set([
 ]);
 
 export const MAX_FILE_BYTES = 1024 * 1024;
-

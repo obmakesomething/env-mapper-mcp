@@ -1,6 +1,7 @@
 export function generateLlmReviewPacket(report) {
   const items = report.variables
     .flatMap((variable) => reviewItemsFor(variable))
+    .concat(dynamicReviewItems(report.dynamicUsages || []))
     .sort(compareReviewItems);
 
   return {
@@ -35,6 +36,7 @@ export function generateLlmReviewPacket(report) {
     summary: {
       variables: report.totals.variables,
       reviewItems: items.length,
+      dynamicUsageCandidates: report.totals.dynamicUsageCandidates || 0,
       missingDeclarations: report.totals.missingDeclarations,
       unusedDeclarations: report.totals.unusedDeclarations,
       secretCandidates: report.totals.secretCandidates,
@@ -94,6 +96,34 @@ function itemFor(variable, kind, severity, reason) {
   };
 }
 
+function dynamicReviewItems(dynamicUsages) {
+  return dynamicUsages.map((source) => ({
+    kind: "dynamic-usage",
+    severity: "medium",
+    variable: "DYNAMIC_ENV_KEY",
+    reason:
+      "An environment access uses a computed key that could not be resolved to a concrete variable name at scan time.",
+    currentClassification: {
+      visibility: "server",
+      sensitivity: "unknown",
+      required: true,
+      confidence: 0.42
+    },
+    evidence: [
+      {
+        kind: source.kind,
+        file: source.file,
+        line: source.line,
+        pattern: source.pattern
+      }
+    ],
+    suggestedQuestions: [
+      "What concrete variable name does this access resolve to in each runtime path?",
+      "Should this be replaced with explicit variable names for better scanner coverage?"
+    ]
+  }));
+}
+
 function questionsFor(kind, variable) {
   if (kind === "missing-declaration") {
     return [
@@ -136,4 +166,3 @@ function compareReviewItems(a, b) {
   const rank = { high: 0, medium: 1, low: 2 };
   return rank[a.severity] - rank[b.severity] || a.variable.localeCompare(b.variable) || a.kind.localeCompare(b.kind);
 }
-

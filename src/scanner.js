@@ -12,6 +12,7 @@ export function scanRepository(rootInput) {
   const byName = new Map();
   const warnings = [];
   let filesScanned = 0;
+  const dynamicUsages = [];
 
   for (const filePath of files) {
     let text;
@@ -22,9 +23,13 @@ export function scanRepository(rootInput) {
       continue;
     }
     filesScanned += 1;
-    for (const finding of detectFile(filePath, root, text)) {
+    const scanResult = detectFile(filePath, root, text);
+    for (const finding of scanResult.findings) {
       if (!byName.has(finding.name)) byName.set(finding.name, []);
       byName.get(finding.name).push(finding);
+    }
+    if (Array.isArray(scanResult.dynamicUsages)) {
+      dynamicUsages.push(...scanResult.dynamicUsages);
     }
   }
 
@@ -45,6 +50,7 @@ export function scanRepository(rootInput) {
     });
 
   return {
+    dynamicUsages,
     version: VERSION,
     root,
     generatedAt: new Date().toISOString(),
@@ -54,7 +60,8 @@ export function scanRepository(rootInput) {
       missingDeclarations: variables.filter((item) => item.missingDeclaration).length,
       unusedDeclarations: variables.filter((item) => item.unusedDeclaration).length,
       secretCandidates: variables.filter((item) => item.sensitivity === "secret").length,
-      reviewCandidates: variables.filter((item) => item.needsReview).length
+      reviewCandidates: variables.filter((item) => item.needsReview).length,
+      dynamicUsageCandidates: dynamicUsages.length
     },
     variables,
     warnings

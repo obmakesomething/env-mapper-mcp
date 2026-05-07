@@ -43,6 +43,34 @@ test("scanner ignores local env files by default", () => {
   assert.equal(JSON.stringify(report).includes("super-secret"), false);
 });
 
+test("scanner ignores codex artifact directories by default", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, ".codex-artifacts", "old"), { recursive: true });
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, ".codex-artifacts", "old", "env.js"), "process.env.ARTIFACT_ONLY_TOKEN;\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "index.js"), "process.env.ACTIVE_SOURCE_TOKEN;\n", "utf8");
+
+  const report = scanRepository(root);
+  const names = report.variables.map((item) => item.name);
+
+  assert.deepEqual(names, ["ACTIVE_SOURCE_TOKEN"]);
+});
+
+test("scanner ignores Python virtual environment directories by default", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "venv", "lib"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".venv", "lib"), { recursive: true });
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "venv", "lib", "package.js"), "process.env.VENV_ONLY_TOKEN;\n", "utf8");
+  fs.writeFileSync(path.join(root, ".venv", "lib", "package.js"), "process.env.DOT_VENV_ONLY_TOKEN;\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "index.js"), "process.env.ACTIVE_SOURCE_TOKEN;\n", "utf8");
+
+  const report = scanRepository(root);
+  const names = report.variables.map((item) => item.name);
+
+  assert.deepEqual(names, ["ACTIVE_SOURCE_TOKEN"]);
+});
+
 test("scanner does not treat JS template literals as shell env references", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
   fs.mkdirSync(path.join(root, "src"));
@@ -56,6 +84,74 @@ test("scanner does not treat JS template literals as shell env references", () =
   const names = report.variables.map((item) => item.name);
 
   assert.deepEqual(names, ["REAL_ENV_KEY"]);
+});
+
+test("scanner ignores comments/strings and flags js dynamic env keys for review", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(
+    path.join(root, "src", "index.ts"),
+    [
+      "const real = process.env.REAL_ENV_KEY;",
+      "const templated = process.env[`TEMPLATE_ENV_KEY`];",
+      "const computed = process.env[dynamicKey];",
+      "const metadata = import.meta.env['META_PUBLIC_ENV'];",
+      "const metadataDynamic = import.meta.env[metaKey];",
+      "const deno = Deno.env.get(\"DENO_STATIC_KEY\");",
+      "const denoComputed = Deno.env.get(runtimeEnvKey);",
+      "const bun = Bun.env.BUN_STATIC;",
+      "const bunComputed = Bun.env[`BUN_${suffix}`];",
+      "const commented = `process.env.DONT_COUNT`;",
+      "const exprRegex = `${/process\\.env\\.TEMPLATE_REGEX_SECRET/.test(input)}`;",
+      "const exprReal = `${process.env.TEMPLATE_EXPR_REAL}`;",
+      "const stringed = 'process.env.NOT_A_REAL_KEY';",
+      "const lines = [",
+      "  // process.env.LINE_COMMENT_KEY",
+      "  /* import.meta.env.BLOCK_COMMENT_KEY */",
+      "]"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const report = scanRepository(root);
+  const names = report.variables.map((item) => item.name).sort();
+  const dynamicPatterns = report.dynamicUsages.map((item) => item.pattern).sort();
+
+  assert.deepEqual(names, [
+    "BUN_STATIC",
+    "DENO_STATIC_KEY",
+    "META_PUBLIC_ENV",
+    "REAL_ENV_KEY",
+    "TEMPLATE_ENV_KEY",
+    "TEMPLATE_EXPR_REAL"
+  ]);
+  assert.equal(report.totals.dynamicUsageCandidates, 4);
+  assert.deepEqual(dynamicPatterns, [
+    "Bun.env.bracket.dynamic",
+    "Deno.env.get.dynamic",
+    "import.meta.env.bracket.dynamic",
+    "process.env.bracket.dynamic"
+  ]);
+});
+
+test("scanner ignores JS regex literals while preserving common process env keys", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(
+    path.join(root, "src", "regex.js"),
+    [
+      "const matcher = /process\\.env\\.REGEX_ONLY_SECRET/;",
+      "const matcherWithClass = /[A-Z]process\\.env\\.REGEX_CLASS_TOKEN\\//;",
+      "const pathValue = process.env.PATH;",
+      "const homeValue = process.env['HOME'];"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const report = scanRepository(root);
+  const names = report.variables.map((item) => item.name).sort();
+
+  assert.deepEqual(names, ["HOME", "PATH"]);
 });
 
 test("scanner rejects missing roots", () => {
@@ -103,6 +199,21 @@ test("scan cli emits redacted output", () => {
   assert.equal(output.report.totals.variables, 5);
   assert.equal(output.plan.mode, "dry-run");
   assert.equal(output.llm.mode, "redacted-llm-review-packet");
+});
+
+test("llm packet includes dynamic env access review candidates", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "index.js"), "const value = Bun.env[process.env.DYN_KEY];\n", "utf8");
+
+  const report = scanRepository(root);
+  const packet = generateLlmReviewPacket(report);
+  const dynamicReviewItem = packet.reviewItems.find((item) => item.kind === "dynamic-usage");
+
+  assert.equal(packet.summary.dynamicUsageCandidates, 1);
+  assert.equal(dynamicReviewItem.kind, "dynamic-usage");
+  assert.equal(dynamicReviewItem.variable, "DYNAMIC_ENV_KEY");
+  assert.equal(dynamicReviewItem.evidence[0].pattern, "Bun.env.bracket.dynamic");
 });
 
 test("llm packet provides redacted review items", () => {
