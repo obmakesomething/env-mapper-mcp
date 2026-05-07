@@ -26,10 +26,10 @@ Checked on 2026-05-07:
 
 | Program | Fit | Official-criteria check | Why | Human action |
 | --- | --- | --- | --- | --- |
-| OpenAI Codex for Open Source | Strong primary fit | Matched: public OSS maintainer project and Codex maintainer workflows. | The project can use Codex for PR review, scanner regression work, docs, and maintainer automation. | Apply after maintainer identity and repo proof are reviewed. |
-| OpenAI Codex Open Source Fund | Strong primary fit | Matched: form asks for OSS project, GitHub repo, description, collaborators, and API-credit use. | The API-credit plan is tied to redacted LLM review packets and maintainer workflows. | Apply after final maintainer review. |
+| OpenAI Codex for Open Source | Strong primary fit | Matched: public OSS maintainer project and core maintainer workflows. The page says maintainers can apply for API credits, six months of ChatGPT Pro with Codex, and conditional Codex Security access. | The project can use Codex for PR review, scanner regression work, docs, release workflows, and maintainer automation. | Apply after maintainer identity and repo proof are reviewed. |
+| OpenAI Codex Open Source Fund | Strong primary fit | Matched: form asks for OSS project, GitHub repo, description, collaborators, and API-credit use. The form describes grants up to $25,000 in API credits. | The API-credit plan is tied to redacted LLM review packets and maintainer workflows. | Apply after final maintainer review. |
 | Anthropic for Startups | Conditional fit | Not verified: requires eligible startup backing through Anthropic VC partners. | The program is aimed at early-stage startups backed by Anthropic VC partners. | Use only if the maintainer has eligible VC backing or an investor partner link. |
-| Anthropic External Researcher Access | Weak or conditional fit | Not matched for general tooling: requires AI safety/alignment research. | Env Mapper MCP is primarily developer tooling, not alignment research. | Do not use unless the project is reframed as a concrete safety/alignment evaluation project. |
+| Anthropic External Researcher Access | Weak or conditional fit | Not matched for general tooling: requires AI safety/alignment research and is evaluated monthly. | Env Mapper MCP is primarily developer tooling, not alignment research. | Do not use unless the project is reframed as a concrete safety/alignment evaluation project. |
 
 ## Submission Guardrails
 
@@ -67,7 +67,24 @@ License:
 
 Stage:
 
-- Early public MVP with CLI, MCP server, GitHub Action, tests, docs, and passing CI.
+- Early public MVP with CLI, MCP server, GitHub Action, npm package, tests,
+  docs, passing CI, and trusted publishing configured for future releases.
+
+Package:
+
+- https://www.npmjs.com/package/env-mapper-mcp
+
+Release:
+
+- https://github.com/obmakesomething/env-mapper-mcp/releases/tag/v0.1.0
+
+Maintainer fields for the form:
+
+- legal name: Daeyoung Lee
+- LinkedIn: https://www.linkedin.com/in/oblee2
+- GitHub: https://github.com/obmakesomething
+- email: human confirmation required before submission
+- collaborators: none listed unless the maintainer adds names
 
 Short description:
 
@@ -101,6 +118,8 @@ Technical proof:
 - GitHub Action can audit pull requests with redacted markdown.
 - JS/TS scanner precision now handles comments, strings, template literals,
   regex literals, static bracket access, and dynamic access metadata.
+- The package is published as `env-mapper-mcp@0.1.0`.
+- npm trusted publishing is configured for the GitHub publish workflow.
 - Tests and CI pass publicly.
 
 Safety:
@@ -127,7 +146,8 @@ Env Mapper MCP is a read-only open-source CLI, GitHub Action, and MCP server
 that maps environment variable usage across a repository. It produces a
 redacted inventory, a DMNO schema draft, a dry-run secret-store sync plan, and a
 redacted LLM review packet so maintainers can resolve env drift without
-exposing secret values to an agent.
+exposing secret values to an agent. The project is published on npm as
+`env-mapper-mcp` and includes a GitHub Action for pull request env audits.
 
 ### GitHub repository
 
@@ -153,10 +173,9 @@ approval.
 
 Human review required:
 
-- maintainer name
-- GitHub profile
-- role
-- expected project contribution
+- no collaborators are currently listed
+- add names only if the maintainer wants to include additional project
+  contributors and their roles
 
 ### Anything else to know?
 
@@ -164,8 +183,8 @@ Env Mapper MCP is designed to complement, not replace, tools like DMNO and
 Infisical. DMNO can own typed runtime env validation; Infisical or provider
 MCPs can own secret CRUD; Env Mapper MCP owns the safe mapping layer that reads
 the code and prepares redacted review artifacts. The project is intentionally
-small, public, and workflow-focused so it can be useful to maintainers before
-any provider write permissions are introduced.
+small, public, npm-installable, and workflow-focused so it can be useful to
+maintainers before any provider write permissions are introduced.
 
 ## Anthropic/Claude Draft Positioning
 
@@ -205,17 +224,31 @@ Human review required before using that framing:
 - MVP commit: `4940706`
 - GitHub Action PR: https://github.com/obmakesomething/env-mapper-mcp/pull/1
 - JS/TS precision PR: https://github.com/obmakesomething/env-mapper-mcp/pull/2
+- OSS launch packet PR:
+  https://github.com/obmakesomething/env-mapper-mcp/pull/3
+- npm readiness PR:
+  https://github.com/obmakesomething/env-mapper-mcp/pull/4
+- first-publish docs correction PR:
+  https://github.com/obmakesomething/env-mapper-mcp/pull/5
+- npm bin metadata fix PR:
+  https://github.com/obmakesomething/env-mapper-mcp/pull/6
+- post-publish docs cleanup PR:
+  https://github.com/obmakesomething/env-mapper-mcp/pull/7
+- npm package: https://www.npmjs.com/package/env-mapper-mcp
+- GitHub release: https://github.com/obmakesomething/env-mapper-mcp/releases/tag/v0.1.0
 - Latest passing CI used for support packet:
-  https://github.com/obmakesomething/env-mapper-mcp/actions/runs/25476606536
+  https://github.com/obmakesomething/env-mapper-mcp/actions/runs/25503809825
 - Security model: `docs/security.md`
 - LLM integration model: `docs/llm-integration.md`
 - Provider mutation contract: `docs/provider-contract.md`
 
 ## Human Review Checklist
 
-- [ ] Confirm maintainer legal name, email, GitHub, and LinkedIn fields.
-- [ ] Confirm whether collaborators should be named.
-- [ ] Confirm OpenAI application route: Codex for OSS, Open Source Fund, or both.
+- [x] Confirm maintainer legal name, GitHub, and LinkedIn fields.
+- [ ] Confirm maintainer email field.
+- [x] Confirm whether collaborators should be named.
+- [x] Confirm OpenAI application route: Codex for OSS / Open Source Fund form.
 - [ ] Confirm whether any Anthropic route is actually eligible.
 - [ ] Review final prose for claims and tone.
-- [ ] Submit manually; do not delegate actual submission to an agent.
+- [ ] Submit manually or with maintainer-supervised browser assistance; do not
+      submit without the maintainer reviewing the final form state.
