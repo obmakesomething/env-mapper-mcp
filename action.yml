@@ -1,0 +1,29 @@
+name: Env Mapper MCP PR Audit
+description: Scan a repository and emit a redacted Markdown env audit summary for PR review.
+author: Env Mapper MCP
+
+inputs:
+  root:
+    description: Repository or service root to scan.
+    required: false
+    default: "."
+  output:
+    description: Optional path to write the Markdown audit summary.
+    required: false
+    default: ""
+
+outputs:
+  markdown:
+    description: Redacted Markdown env audit summary.
+  markdown_path:
+    description: Path to the written Markdown summary, when output was provided.
+  missing_declarations:
+    description: Count of variables used without env-file declaration or provider reference.
+  unused_declarations:
+    description: Count of declarations without direct code usage.
+  review_candidates:
+    description: Count of variables needing public/secret review.
+
+runs:
+  using: node20
+  main: src/github-action.js
