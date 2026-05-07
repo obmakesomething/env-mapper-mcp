@@ -1,0 +1,34 @@
+{
+  "name": "env-mapper-mcp",
+  "version": "0.1.0",
+  "description": "Read-only env var mapper that turns repo usage into DMNO drafts and secret-store sync plans.",
+  "type": "module",
+  "bin": {
+    "env-mapper": "./src/cli.js"
+  },
+  "scripts": {
+    "scan": "node src/cli.js scan",
+    "mcp": "node src/cli.js mcp",
+    "test": "node --test test/*.test.js",
+    "build": "node src/cli.js scan --root test/fixtures/basic --emit all --format json > /tmp/env-mapper-build-check.json"
+  },
+  "keywords": [
+    "mcp",
+    "environment-variables",
+    "secrets",
+    "dmno",
+    "infisical",
+    "dotenv",
+    "configuration"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ]
+}
