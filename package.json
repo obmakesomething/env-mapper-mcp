@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "description": "Read-only env var mapper that turns repo usage into DMNO drafts and secret-store sync plans.",
   "type": "module",
+  "author": "Daeyoung Lee",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/obmakesomething/env-mapper-mcp.git"
+  },
+  "homepage": "https://github.com/obmakesomething/env-mapper-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/obmakesomething/env-mapper-mcp/issues"
+  },
   "bin": {
     "env-mapper": "./src/cli.js"
   },
@@ -10,7 +19,9 @@
     "scan": "node src/cli.js scan",
     "mcp": "node src/cli.js mcp",
     "test": "node --test test/*.test.js",
-    "build": "node src/cli.js scan --root test/fixtures/basic --emit all --format json > /tmp/env-mapper-build-check.json"
+    "build": "node scripts/build-check.js",
+    "pack:check": "node scripts/pack-check.js",
+    "prepublishOnly": "npm test && npm run build && npm run pack:check"
   },
   "keywords": [
     "mcp",
@@ -26,9 +37,13 @@
     "node": ">=20"
   },
   "files": [
+    "action.yml",
     "src",
     "docs",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -42,8 +42,19 @@ Requirements:
 - Node.js 20+
 - no runtime package install required
 
-The project is currently used directly from the GitHub repository or a GitHub
-Action ref. It is not published to npm yet.
+The first npm publish is prepared but not yet run. After the first release is
+published, use the package directly:
+
+```bash
+npx --package env-mapper-mcp env-mapper scan --root /path/to/repo --emit all --format json
+```
+
+Or install the CLI:
+
+```bash
+npm install -g env-mapper-mcp
+env-mapper scan --root /path/to/repo --emit all --format json
+```
 
 Clone and scan a repository:
 
@@ -75,12 +86,12 @@ Unused declarations: 2
 ## CLI
 
 ```bash
-node src/cli.js scan --root . --emit report --format json
-node src/cli.js scan --root . --emit dmno --format text
-node src/cli.js scan --root . --emit plan --provider infisical --format json
-node src/cli.js scan --root . --emit llm --format json
-node src/cli.js scan --root . --emit all --format json
-node src/cli.js mcp
+env-mapper scan --root . --emit report --format json
+env-mapper scan --root . --emit dmno --format text
+env-mapper scan --root . --emit plan --provider infisical --format json
+env-mapper scan --root . --emit llm --format json
+env-mapper scan --root . --emit all --format json
+env-mapper mcp
 ```
 
 Options:
@@ -98,7 +109,7 @@ values. Env-file values are reduced to presence metadata.
 Start the stdio server:
 
 ```bash
-node src/cli.js mcp
+env-mapper mcp
 ```
 
 Available tools:
@@ -110,6 +121,15 @@ Available tools:
   LLM-assisted mapping
 
 Example client command:
+
+```json
+{
+  "command": "env-mapper",
+  "args": ["mcp"]
+}
+```
+
+From a source checkout before the npm package is published, use:
 
 ```json
 {
@@ -202,7 +222,7 @@ the override behavior you need.
 Use this when an LLM should review env drift without seeing secret values:
 
 ```bash
-node src/cli.js scan --root . --emit llm --format json
+env-mapper scan --root . --emit llm --format json
 ```
 
 The packet contains:
@@ -235,6 +255,7 @@ See [docs/security.md](docs/security.md) and
 ```bash
 npm test
 npm run build
+npm run pack:check
 node src/cli.js scan --root test/fixtures/basic --emit all --format json
 ```
 
@@ -249,6 +270,9 @@ Current CI runs:
 For public positioning, launch checklist, and human-reviewed AI support program
 drafts, see [docs/oss-launch.md](docs/oss-launch.md) and
 [docs/support-programs.md](docs/support-programs.md).
+
+For first npm release steps and trusted-publishing setup, see
+[docs/npm-publishing.md](docs/npm-publishing.md).
 
 ## Roadmap
 
