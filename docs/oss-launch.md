@@ -141,10 +141,11 @@ Maintainer ask:
 - [x] GitHub Action has copy-paste docs.
 - [x] CI passes on public PRs.
 - [x] JS/TS precision improved before support applications.
+- [x] npm package published as `env-mapper-mcp@0.1.0`.
+- [x] npm trusted publishing configured for future releases.
 - [ ] Add screenshots or copied PR-summary example to README.
 - [ ] Add repo-specific ignore override docs.
 - [ ] Add issue templates for false positive and provider adapter requests.
-- [ ] Add package publishing plan before npm release.
 
 ## Next Roadmap
 
