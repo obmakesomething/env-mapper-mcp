@@ -141,6 +141,12 @@ See [docs/security.md](docs/security.md) and
 [docs/llm-integration.md](docs/llm-integration.md) for the safe LLM review
 pattern.
 
+## OSS Launch And Support Packet
+
+For public positioning, launch checklist, and human-reviewed AI support program
+drafts, see [docs/oss-launch.md](docs/oss-launch.md) and
+[docs/support-programs.md](docs/support-programs.md).
+
 ## Roadmap
 
 - TypeScript package build once package manager setup is available.
