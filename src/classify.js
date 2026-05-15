@@ -27,12 +27,16 @@ const SECRET_HINTS = [
   "AUTH"
 ];
 
-export function classifyVariable(name, sources) {
-  const visibility = PUBLIC_PREFIXES.some((prefix) => name.startsWith(prefix))
+export function classifyVariable(name, sources, scanConfig = {}) {
+  const publicPrefixes = scanConfig.publicPrefixes?.length ? scanConfig.publicPrefixes : PUBLIC_PREFIXES;
+  const secretHints = scanConfig.secretHints?.length ? scanConfig.secretHints : SECRET_HINTS;
+  const knownPublic = new Set(scanConfig.knownPublic || []);
+  const knownSecret = new Set(scanConfig.knownSecret || []);
+  const visibility = knownPublic.has(name) || publicPrefixes.some((prefix) => name.startsWith(prefix))
     ? "public"
     : "server";
-  const hasSecretHint = SECRET_HINTS.some((hint) => name.includes(hint));
-  const sensitivity = hasSecretHint ? "secret" : visibility === "public" ? "public-config" : "unknown";
+  const hasSecretHint = knownSecret.has(name) || (!knownPublic.has(name) && secretHints.some((hint) => name.includes(hint)));
+  const sensitivity = knownSecret.has(name) ? "secret" : knownPublic.has(name) ? "public-config" : hasSecretHint ? "secret" : visibility === "public" ? "public-config" : "unknown";
   const hasUsage = sources.some((source) => source.kind === "usage");
   const hasDeclaration = sources.some((source) => source.kind === "declaration");
   const hasProviderReference = sources.some((source) => source.kind === "provider-reference");
@@ -76,4 +80,3 @@ function confidenceFor({ hasUsage, hasDeclaration, hasProviderReference, hasSecr
   if (hasSecretHint) score += 0.05;
   return Math.min(Number(score.toFixed(2)), 0.95);
 }
-

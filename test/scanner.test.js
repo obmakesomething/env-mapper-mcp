@@ -18,11 +18,18 @@ test("scanner maps usage, declarations, and provider references without values",
   const report = scanRepository(fixtureRoot);
   const byName = new Map(report.variables.map((item) => [item.name, item]));
 
+  assert.equal(report.schemaVersion, "0.1");
+  assert.equal(report.toolVersion, report.version);
+  assert.ok(Array.isArray(report.findings));
   assert.equal(byName.get("DATABASE_URL").sensitivity, "secret");
   assert.equal(byName.get("DATABASE_URL").missingDeclaration, false);
   assert.equal(byName.get("NEXT_PUBLIC_APP_URL").visibility, "public");
   assert.equal(byName.get("MISSING_API_TOKEN").missingDeclaration, true);
+  assert.equal(byName.get("MISSING_API_TOKEN").findings[0].kind, "missing-declaration");
+  assert.match(byName.get("MISSING_API_TOKEN").findings[0].id, /^fnd_[a-z0-9]+$/);
   assert.equal(byName.get("UNUSED_LEGACY_TOKEN").unusedDeclaration, true);
+  assert.equal(byName.get("UNUSED_LEGACY_TOKEN").findings[0].kind, "declared-only");
+  assert.ok(report.findings.find((finding) => finding.variable === "UNUSED_LEGACY_TOKEN"));
 
   const serialized = JSON.stringify(report);
   assert.equal(serialized.includes("postgres://"), false);
@@ -72,6 +79,98 @@ test("scanner ignores Python virtual environment directories by default", () => 
   assert.deepEqual(names, ["ACTIVE_SOURCE_TOKEN"]);
 });
 
+test("scanner loads json config for include, exclude, classification, ignores, and source limits", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.mkdirSync(path.join(root, "ignored"));
+  fs.writeFileSync(path.join(root, ".env-mapper.json"), JSON.stringify({
+    include: ["src/**"],
+    exclude: ["src/excluded.js"],
+    knownPublic: ["APP_DSN"],
+    knownSecret: ["CUSTOM_PASSWORD"],
+    ignoreKeys: ["IGNORED_KEY"],
+    maxSourcesPerVariable: 1
+  }), "utf8");
+  fs.writeFileSync(
+    path.join(root, "src", "index.js"),
+    [
+      "process.env.APP_DSN;",
+      "process.env.CUSTOM_PASSWORD;",
+      "process.env.IGNORED_KEY;",
+      "process.env.REPEATED_KEY;",
+      "process.env.REPEATED_KEY;"
+    ].join("\n"),
+    "utf8"
+  );
+  fs.writeFileSync(path.join(root, "src", "excluded.js"), "process.env.EXCLUDED_KEY;\n", "utf8");
+  fs.writeFileSync(path.join(root, "ignored", "other.js"), "process.env.OUTSIDE_INCLUDE;\n", "utf8");
+
+  const report = scanRepository(root);
+  const byName = new Map(report.variables.map((item) => [item.name, item]));
+
+  assert.equal(report.scanConfig.configPath, path.join(root, ".env-mapper.json"));
+  assert.match(report.scanConfigHash, /^[a-f0-9]{16}$/);
+  assert.deepEqual([...byName.keys()].sort(), ["APP_DSN", "CUSTOM_PASSWORD", "REPEATED_KEY"]);
+  assert.equal(byName.get("APP_DSN").visibility, "public");
+  assert.equal(byName.get("APP_DSN").sensitivity, "public-config");
+  assert.equal(byName.get("CUSTOM_PASSWORD").sensitivity, "secret");
+  assert.equal(byName.get("REPEATED_KEY").sources.length, 1);
+  assert.ok(report.warnings.find((warning) => warning.includes("maxSourcesPerVariable=1")));
+});
+
+test("scanner loads mjs config and enforces allowed roots", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "env-mapper.config.mjs"), "export default { allowedRoots: ['.'], secretHints: ['OPAQUE'] };\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "index.js"), "process.env.OPAQUE_VALUE;\n", "utf8");
+
+  const report = scanRepository(root);
+  assert.equal(report.variables[0].sensitivity, "secret");
+
+  const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-outside-"));
+  fs.mkdirSync(path.join(outsideRoot, "src"));
+  fs.writeFileSync(path.join(outsideRoot, "src", "index.js"), "process.env.OUTSIDE_VALUE;\n", "utf8");
+  assert.throws(
+    () => scanRepository(outsideRoot, { config: path.join(root, "env-mapper.config.mjs") }),
+    /outside allowedRoots/
+  );
+});
+
+test("scanner applies include, exclude, and maxFileBytes to env templates", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, ".env.example"), "EXCLUDED_TEMPLATE_TOKEN=\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "index.js"), "process.env.ACTIVE_SOURCE_TOKEN;\n", "utf8");
+
+  let report = scanRepository(root, {
+    config: writeConfig(root, {
+      include: ["src/**"],
+      exclude: [".env.example"]
+    })
+  });
+  assert.deepEqual(report.variables.map((item) => item.name), ["ACTIVE_SOURCE_TOKEN"]);
+
+  report = scanRepository(root, {
+    config: writeConfig(root, {
+      include: [".env.example"],
+      maxFileBytes: 1
+    })
+  });
+  assert.deepEqual(report.variables.map((item) => item.name), []);
+});
+
+test("scanner enforces maxOutputBytes", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "index.js"), "process.env.ACTIVE_SOURCE_TOKEN;\n", "utf8");
+  const configPath = writeConfig(root, { maxOutputBytes: 1 });
+
+  assert.throws(
+    () => scanRepository(root, { config: configPath }),
+    /exceeds maxOutputBytes=1/
+  );
+});
+
 test("scanner does not treat JS template literals as shell env references", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
   fs.mkdirSync(path.join(root, "src"));
@@ -86,6 +185,12 @@ test("scanner does not treat JS template literals as shell env references", () =
 
   assert.deepEqual(names, ["REAL_ENV_KEY"]);
 });
+
+function writeConfig(root, config) {
+  const configPath = path.join(root, `.env-mapper-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+  fs.writeFileSync(configPath, JSON.stringify(config), "utf8");
+  return configPath;
+}
 
 test("scanner ignores comments/strings and flags js dynamic env keys for review", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
@@ -127,6 +232,7 @@ test("scanner ignores comments/strings and flags js dynamic env keys for review"
     "TEMPLATE_EXPR_REAL"
   ]);
   assert.equal(report.totals.dynamicUsageCandidates, 4);
+  assert.equal(report.findings.filter((finding) => finding.kind === "dynamic-env-access").length, 4);
   assert.deepEqual(dynamicPatterns, [
     "Bun.env.bracket.dynamic",
     "Deno.env.get.dynamic",
@@ -177,9 +283,11 @@ test("secret plan is dry-run and contains no apply support", () => {
   const plan = generateSecretPlan(report, "infisical");
 
   assert.equal(plan.mode, "dry-run");
+  assert.equal(plan.schemaVersion, "0.1");
   assert.equal(plan.actions.some((action) => action.applySupported), false);
   assert.ok(plan.actions.find((action) => action.key === "DATABASE_URL"));
   assert.equal(plan.actions.find((action) => action.key === "UNUSED_LEGACY_TOKEN").action, "mark_unused_candidate");
+  assert.ok(plan.actions.find((action) => action.key === "UNUSED_LEGACY_TOKEN").findingIds.length > 0);
 });
 
 test("scan cli emits redacted output", () => {
@@ -229,10 +337,10 @@ test("llm packet includes dynamic env access review candidates", () => {
 
   const report = scanRepository(root);
   const packet = generateLlmReviewPacket(report);
-  const dynamicReviewItem = packet.reviewItems.find((item) => item.kind === "dynamic-usage");
+  const dynamicReviewItem = packet.reviewItems.find((item) => item.kind === "dynamic-env-access");
 
   assert.equal(packet.summary.dynamicUsageCandidates, 1);
-  assert.equal(dynamicReviewItem.kind, "dynamic-usage");
+  assert.equal(dynamicReviewItem.kind, "dynamic-env-access");
   assert.equal(dynamicReviewItem.variable, "DYNAMIC_ENV_KEY");
   assert.equal(dynamicReviewItem.evidence[0].pattern, "Bun.env.bracket.dynamic");
 });
@@ -242,6 +350,7 @@ test("llm packet provides redacted review items", () => {
   const packet = generateLlmReviewPacket(report);
 
   assert.equal(packet.mode, "redacted-llm-review-packet");
+  assert.equal(packet.schemaVersion, "0.1");
   assert.equal(packet.safety.containsSecretValues, false);
   assert.equal(packet.safety.mayMutateProviders, false);
   assert.ok(packet.reviewItems.find((item) => item.variable === "MISSING_API_TOKEN"));

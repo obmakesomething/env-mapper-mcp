@@ -1,3 +1,5 @@
+import { REPORT_SCHEMA_VERSION, VERSION } from "./constants.js";
+
 export function generateSecretPlan(report, provider = "infisical") {
   const actions = [];
 
@@ -7,9 +9,10 @@ export function generateSecretPlan(report, provider = "infisical") {
         action: "mark_unused_candidate",
         provider,
         key: variable.name,
-        reason: "Declared but no direct usage or provider reference was found.",
+        reason: "Declared but no direct usage or provider reference was found; review before cleanup.",
         requiresValue: false,
         applySupported: false,
+        findingIds: findingIdsFor(variable),
         sources: compactSources(variable)
       });
       continue;
@@ -23,6 +26,7 @@ export function generateSecretPlan(report, provider = "infisical") {
         reason: reasonFor(variable),
         requiresValue: true,
         applySupported: false,
+        findingIds: findingIdsFor(variable),
         sources: compactSources(variable)
       });
       continue;
@@ -36,6 +40,7 @@ export function generateSecretPlan(report, provider = "infisical") {
         reason: reasonFor(variable),
         requiresValue: false,
         applySupported: false,
+        findingIds: findingIdsFor(variable),
         sources: compactSources(variable)
       });
       continue;
@@ -46,6 +51,9 @@ export function generateSecretPlan(report, provider = "infisical") {
 
   return {
     mode: "dry-run",
+    schemaVersion: report.schemaVersion || REPORT_SCHEMA_VERSION,
+    toolVersion: report.toolVersion || VERSION,
+    version: report.version || VERSION,
     provider,
     generatedAt: report.generatedAt,
     root: report.root,
@@ -76,4 +84,8 @@ function compactSources(variable) {
     line: source.line,
     pattern: source.pattern
   }));
+}
+
+function findingIdsFor(variable) {
+  return (variable.findings || []).map((finding) => finding.id);
 }

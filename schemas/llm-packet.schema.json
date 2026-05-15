@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://env-mapper-mcp.local/schemas/llm-packet.schema.json",
+  "title": "Env Mapper LLM Review Packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "schemaVersion",
+    "toolVersion",
+    "version",
+    "generatedAt",
+    "root",
+    "purpose",
+    "safety",
+    "modelInstructions",
+    "summary",
+    "reviewItems",
+    "redactedVariables"
+  ],
+  "properties": {
+    "mode": { "const": "redacted-llm-review-packet" },
+    "schemaVersion": { "const": "0.1" },
+    "toolVersion": { "type": "string" },
+    "version": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "root": { "type": "string" },
+    "purpose": { "type": "string" },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "containsSecretValues",
+        "mayRequestSecretValues",
+        "mayMutateProviders",
+        "allowedOutputs",
+        "forbiddenOutputs"
+      ],
+      "properties": {
+        "containsSecretValues": { "const": false },
+        "mayRequestSecretValues": { "const": false },
+        "mayMutateProviders": { "const": false },
+        "allowedOutputs": { "type": "array", "items": { "type": "string" } },
+        "forbiddenOutputs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "modelInstructions": { "type": "array", "items": { "type": "string" } },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variables",
+        "reviewItems",
+        "findings",
+        "dynamicUsageCandidates",
+        "missingDeclarations",
+        "unusedDeclarations",
+        "secretCandidates",
+        "reviewCandidates"
+      ],
+      "properties": {
+        "variables": { "type": "integer", "minimum": 0 },
+        "reviewItems": { "type": "integer", "minimum": 0 },
+        "findings": { "type": "integer", "minimum": 0 },
+        "dynamicUsageCandidates": { "type": "integer", "minimum": 0 },
+        "missingDeclarations": { "type": "integer", "minimum": 0 },
+        "unusedDeclarations": { "type": "integer", "minimum": 0 },
+        "secretCandidates": { "type": "integer", "minimum": 0 },
+        "reviewCandidates": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "reviewItems": { "type": "array", "items": { "$ref": "#/$defs/reviewItem" } },
+    "redactedVariables": { "type": "array", "items": { "$ref": "#/$defs/redactedVariable" } }
+  },
+  "$defs": {
+    "reviewItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "severity",
+        "variable",
+        "reason",
+        "currentClassification",
+        "evidence",
+        "suggestedQuestions"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": {
+          "enum": [
+            "missing-declaration",
+            "unused-in-code",
+            "declared-only",
+            "public-secret-conflict",
+            "dynamic-env-access",
+            "unknown-sensitivity",
+            "provider-reference-without-declaration"
+          ]
+        },
+        "severity": { "enum": ["high", "medium", "low", "info"] },
+        "variable": { "type": "string" },
+        "reason": { "type": "string" },
+        "currentClassification": { "$ref": "#/$defs/classification" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/source" } },
+        "suggestedQuestions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "redactedVariable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "visibility",
+        "sensitivity",
+        "required",
+        "confidence",
+        "usageCount",
+        "declarationCount",
+        "referenceCount",
+        "providerReferenceCount",
+        "notes",
+        "findings",
+        "sources"
+      ],
+      "properties": {
+        "name": { "type": "string" },
+        "visibility": { "enum": ["public", "server"] },
+        "sensitivity": { "enum": ["secret", "public-config", "unknown"] },
+        "required": { "type": "boolean" },
+        "confidence": { "type": "number", "minimum": 0 },
+        "usageCount": { "type": "integer", "minimum": 0 },
+        "declarationCount": { "type": "integer", "minimum": 0 },
+        "referenceCount": { "type": "integer", "minimum": 0 },
+        "providerReferenceCount": { "type": "integer", "minimum": 0 },
+        "notes": { "type": "array", "items": { "type": "string" } },
+        "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visibility", "sensitivity", "required", "confidence"],
+      "properties": {
+        "visibility": { "enum": ["public", "server"] },
+        "sensitivity": { "enum": ["secret", "public-config", "unknown"] },
+        "required": { "type": "boolean" },
+        "confidence": { "type": "number", "minimum": 0 }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "severity", "variable", "message", "evidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": {
+          "enum": [
+            "missing-declaration",
+            "unused-in-code",
+            "declared-only",
+            "public-secret-conflict",
+            "dynamic-env-access",
+            "unknown-sensitivity",
+            "provider-reference-without-declaration"
+          ]
+        },
+        "severity": { "enum": ["high", "medium", "low", "info"] },
+        "variable": { "type": "string" },
+        "message": { "type": "string" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/source" } }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "file", "line", "pattern"],
+      "properties": {
+        "kind": {
+          "enum": ["declaration", "usage", "reference", "provider-reference", "dynamic-usage"]
+        },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "pattern": { "type": "string" }
+      }
+    }
+  }
+}

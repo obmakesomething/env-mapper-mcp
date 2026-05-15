@@ -29,6 +29,7 @@ const tools = [
       type: "object",
       properties: {
         root: { type: "string", description: "Repository root to scan." },
+        config: { type: "string", description: "Optional env-mapper config path." },
         provider: { type: "string", description: "Provider label for plan metadata.", default: "infisical" }
       },
       required: ["root"]
@@ -42,15 +43,15 @@ const tools = [
   }
 ];
 
-export function startMcpServer({ input = process.stdin, output = process.stdout } = {}) {
+export function startMcpServer({ input = process.stdin, output = process.stdout, defaultOptions = {} } = {}) {
   const rl = readline.createInterface({ input, terminal: false });
   rl.on("line", (line) => {
     if (!line.trim()) return;
-    handleMessage(line, output);
+    handleMessage(line, output, defaultOptions);
   });
 }
 
-function handleMessage(line, output) {
+function handleMessage(line, output, defaultOptions) {
   let message;
   try {
     message = JSON.parse(line);
@@ -62,7 +63,7 @@ function handleMessage(line, output) {
   if (!message.id && message.method?.startsWith("notifications/")) return;
 
   try {
-    const result = dispatch(message);
+    const result = dispatch(message, defaultOptions);
     if (message.id !== undefined) write(output, { jsonrpc: "2.0", id: message.id, result });
   } catch (error) {
     if (message.id !== undefined) {
@@ -75,7 +76,7 @@ function handleMessage(line, output) {
   }
 }
 
-function dispatch(message) {
+function dispatch(message, defaultOptions = {}) {
   switch (message.method) {
     case "initialize":
       return {
@@ -89,36 +90,36 @@ function dispatch(message) {
     case "tools/list":
       return { tools };
     case "tools/call":
-      return callTool(message.params || {});
+      return callTool(message.params || {}, defaultOptions);
     default:
       throw Object.assign(new Error(`Method not found: ${message.method}`), { code: -32601 });
   }
 }
 
-function callTool(params) {
+function callTool(params, defaultOptions = {}) {
   const name = params.name;
   const args = params.arguments || {};
   if (!name) throw Object.assign(new Error("Missing tool name"), { code: -32602 });
 
   if (name === "env_mapper_scan") {
-    const report = scanRepository(requiredRoot(args));
+    const report = scanRepository(requiredRoot(args), scanOptions(args, defaultOptions));
     return toolResult(report);
   }
 
   if (name === "env_mapper_dmno_draft") {
-    const report = scanRepository(requiredRoot(args));
+    const report = scanRepository(requiredRoot(args), scanOptions(args, defaultOptions));
     const result = { file: ".dmno/config.mts", content: generateDmnoDraft(report) };
     return toolResult(result);
   }
 
   if (name === "env_mapper_secret_plan") {
-    const report = scanRepository(requiredRoot(args));
+    const report = scanRepository(requiredRoot(args), scanOptions(args, defaultOptions));
     const result = generateSecretPlan(report, args.provider || "infisical");
     return toolResult(result);
   }
 
   if (name === "env_mapper_llm_packet") {
-    const report = scanRepository(requiredRoot(args));
+    const report = scanRepository(requiredRoot(args), scanOptions(args, defaultOptions));
     const result = generateLlmReviewPacket(report);
     return toolResult(result);
   }
@@ -145,7 +146,8 @@ function rootSchema() {
   return {
     type: "object",
     properties: {
-      root: { type: "string", description: "Repository root to scan." }
+      root: { type: "string", description: "Repository root to scan." },
+      config: { type: "string", description: "Optional env-mapper config path." }
     },
     required: ["root"]
   };
@@ -156,5 +158,11 @@ function write(output, message) {
 }
 
 export function runCliScan(root, options) {
-  return buildEmission(scanRepository(root), options);
+  return buildEmission(scanRepository(root, options), options);
+}
+
+function scanOptions(args, defaultOptions) {
+  return {
+    config: args.config || defaultOptions.config
+  };
 }
