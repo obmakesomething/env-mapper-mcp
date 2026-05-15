@@ -30,8 +30,31 @@ export function formatEmission(emission, format = "json") {
   if (typeof emission.content === "string") return emission.content;
   if (emission.actions) return formatPlanText(emission);
   if (emission.mode === "redacted-llm-review-packet") return formatLlmPacketText(emission);
+  if (emission.mode === "env-mapper-diff") return formatDiffText(emission);
   if (emission.report && emission.dmno && emission.plan) return formatAllText(emission);
   return formatReportText(emission);
+}
+
+function formatDiffText(diff) {
+  const lines = [
+    `Env Mapper diff for ${diff.root}`,
+    `Base: ${diff.base.ref}`,
+    `Head: ${diff.head.ref}`,
+    `New findings: ${diff.summary.newFindings}`,
+    `Resolved findings: ${diff.summary.resolvedFindings}`,
+    `Unchanged findings: ${diff.summary.unchangedFindings}`,
+    `Changed classifications: ${diff.summary.changedClassifications}`,
+    `New variables: ${diff.summary.newVariables}`,
+    `Removed variables: ${diff.summary.removedVariables}`,
+    `New missing declarations: ${diff.summary.newlyMissingDeclarations}`,
+    `New public/secret conflicts: ${diff.summary.newlyPublicSecretConflicts}`,
+    ""
+  ];
+  for (const finding of diff.newFindings.slice(0, 20)) {
+    lines.push(`- [new/${finding.severity}] ${finding.variable} ${finding.kind}: ${finding.message}`);
+  }
+  if (diff.newFindings.length === 0) lines.push("- No new findings.");
+  return `${lines.join("\n")}\n`;
 }
 
 function formatAllText(emission) {

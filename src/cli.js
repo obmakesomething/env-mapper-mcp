@@ -2,15 +2,18 @@
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { formatEmission } from "./format.js";
+import { buildDiff } from "./diff.js";
 import { startMcpServer, runCliScan } from "./mcp-server.js";
 
 const USAGE = `Usage:
   env-mapper scan --root <path> [--config <path>] [--emit report|dmno|plan|llm|all] [--format json|text] [--provider infisical]
+  env-mapper diff --root <path> --base <git-ref-or-report-json> [--head <git-ref-or-report-json>] [--config <path>] [--format json|text]
   env-mapper mcp [--config <path>]
 
 Examples:
   env-mapper scan --root . --emit all --format json
   env-mapper scan --root . --config .env-mapper.json --emit report --format json
+  env-mapper diff --root . --base origin/main --format text
   env-mapper scan --root . --emit dmno --format text
   env-mapper scan --root . --emit llm --format json
   env-mapper mcp
@@ -26,6 +29,13 @@ export function main(argv = process.argv.slice(2)) {
   if (command === "mcp") {
     const options = parseOptions(argv.slice(1));
     startMcpServer({ defaultOptions: options });
+    return 0;
+  }
+
+  if (command === "diff") {
+    const options = parseOptions(argv.slice(1));
+    const diff = buildDiff({ root: options.root, base: options.base, head: options.head, options });
+    process.stdout.write(formatEmission(diff, options.format));
     return 0;
   }
 
@@ -56,6 +66,8 @@ function parseOptions(args) {
     else if (arg === "--format") options.format = requireValue(args, ++i, arg);
     else if (arg === "--provider") options.provider = requireValue(args, ++i, arg);
     else if (arg === "--config") options.config = requireValue(args, ++i, arg);
+    else if (arg === "--base") options.base = requireValue(args, ++i, arg);
+    else if (arg === "--head") options.head = requireValue(args, ++i, arg);
     else if (arg === "--help" || arg === "-h") {
       process.stdout.write(USAGE);
       process.exit(0);
