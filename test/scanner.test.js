@@ -79,6 +79,63 @@ test("scanner ignores Python virtual environment directories by default", () => 
   assert.deepEqual(names, ["ACTIVE_SOURCE_TOKEN"]);
 });
 
+test("scanner loads json config for include, exclude, classification, ignores, and source limits", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.mkdirSync(path.join(root, "ignored"));
+  fs.writeFileSync(path.join(root, ".env-mapper.json"), JSON.stringify({
+    include: ["src/**"],
+    exclude: ["src/excluded.js"],
+    knownPublic: ["APP_DSN"],
+    knownSecret: ["CUSTOM_PASSWORD"],
+    ignoreKeys: ["IGNORED_KEY"],
+    maxSourcesPerVariable: 1
+  }), "utf8");
+  fs.writeFileSync(
+    path.join(root, "src", "index.js"),
+    [
+      "process.env.APP_DSN;",
+      "process.env.CUSTOM_PASSWORD;",
+      "process.env.IGNORED_KEY;",
+      "process.env.REPEATED_KEY;",
+      "process.env.REPEATED_KEY;"
+    ].join("\n"),
+    "utf8"
+  );
+  fs.writeFileSync(path.join(root, "src", "excluded.js"), "process.env.EXCLUDED_KEY;\n", "utf8");
+  fs.writeFileSync(path.join(root, "ignored", "other.js"), "process.env.OUTSIDE_INCLUDE;\n", "utf8");
+
+  const report = scanRepository(root);
+  const byName = new Map(report.variables.map((item) => [item.name, item]));
+
+  assert.equal(report.scanConfig.configPath, path.join(root, ".env-mapper.json"));
+  assert.match(report.scanConfigHash, /^[a-f0-9]{16}$/);
+  assert.deepEqual([...byName.keys()].sort(), ["APP_DSN", "CUSTOM_PASSWORD", "REPEATED_KEY"]);
+  assert.equal(byName.get("APP_DSN").visibility, "public");
+  assert.equal(byName.get("APP_DSN").sensitivity, "public-config");
+  assert.equal(byName.get("CUSTOM_PASSWORD").sensitivity, "secret");
+  assert.equal(byName.get("REPEATED_KEY").sources.length, 1);
+  assert.ok(report.warnings.find((warning) => warning.includes("maxSourcesPerVariable=1")));
+});
+
+test("scanner loads mjs config and enforces allowed roots", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "env-mapper.config.mjs"), "export default { allowedRoots: ['.'], secretHints: ['OPAQUE'] };\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "index.js"), "process.env.OPAQUE_VALUE;\n", "utf8");
+
+  const report = scanRepository(root);
+  assert.equal(report.variables[0].sensitivity, "secret");
+
+  const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-outside-"));
+  fs.mkdirSync(path.join(outsideRoot, "src"));
+  fs.writeFileSync(path.join(outsideRoot, "src", "index.js"), "process.env.OUTSIDE_VALUE;\n", "utf8");
+  assert.throws(
+    () => scanRepository(outsideRoot, { config: path.join(root, "env-mapper.config.mjs") }),
+    /outside allowedRoots/
+  );
+});
+
 test("scanner does not treat JS template literals as shell env references", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
   fs.mkdirSync(path.join(root, "src"));

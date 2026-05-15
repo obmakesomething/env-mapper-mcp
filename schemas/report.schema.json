@@ -7,6 +7,8 @@
   "required": [
     "schemaVersion",
     "toolVersion",
+    "scanConfigHash",
+    "scanConfig",
     "version",
     "root",
     "generatedAt",
@@ -20,6 +22,8 @@
   "properties": {
     "schemaVersion": { "const": "0.1" },
     "toolVersion": { "type": "string" },
+    "scanConfigHash": { "type": "string" },
+    "scanConfig": { "$ref": "#/$defs/scanConfig" },
     "version": { "type": "string" },
     "root": { "type": "string" },
     "generatedAt": { "type": "string" },
@@ -63,6 +67,49 @@
         "reviewCandidates": { "type": "integer", "minimum": 0 },
         "dynamicUsageCandidates": { "type": "integer", "minimum": 0 },
         "findings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "scanConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configPath",
+        "include",
+        "exclude",
+        "serviceRoots",
+        "knownPublic",
+        "knownSecret",
+        "ignoreKeys",
+        "envHelpers",
+        "publicPrefixes",
+        "secretHints",
+        "allowedRoots",
+        "limits"
+      ],
+      "properties": {
+        "configPath": { "type": ["string", "null"] },
+        "include": { "type": "array", "items": { "type": "string" } },
+        "exclude": { "type": "array", "items": { "type": "string" } },
+        "serviceRoots": { "type": "array", "items": { "type": "string" } },
+        "knownPublic": { "type": "array", "items": { "type": "string" } },
+        "knownSecret": { "type": "array", "items": { "type": "string" } },
+        "ignoreKeys": { "type": "array", "items": { "type": "string" } },
+        "envHelpers": { "type": "array", "items": { "type": "string" } },
+        "publicPrefixes": { "type": "array", "items": { "type": "string" } },
+        "secretHints": { "type": "array", "items": { "type": "string" } },
+        "allowedRoots": { "type": "array", "items": { "type": "string" } },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxFileBytes"],
+          "properties": {
+            "maxFiles": { "type": ["integer", "null"], "minimum": 1 },
+            "maxFileBytes": { "type": "integer", "minimum": 1 },
+            "maxVariables": { "type": ["integer", "null"], "minimum": 1 },
+            "maxSourcesPerVariable": { "type": ["integer", "null"], "minimum": 1 },
+            "maxOutputBytes": { "type": ["integer", "null"], "minimum": 1 }
+          }
+        }
       }
     },
     "variable": {

@@ -55,7 +55,8 @@ function validateNode(schema, value, at, rootSchema, errors) {
   }
 
   if (schema.type && !matchesType(value, schema.type)) {
-    errors.push(`${at} expected ${schema.type}, got ${Array.isArray(value) ? "array" : typeof value}`);
+    const expected = Array.isArray(schema.type) ? schema.type.join(" or ") : schema.type;
+    errors.push(`${at} expected ${expected}, got ${Array.isArray(value) ? "array" : value === null ? "null" : typeof value}`);
     return;
   }
 
@@ -92,6 +93,8 @@ function resolveRef(schema, ref) {
 }
 
 function matchesType(value, type) {
+  if (Array.isArray(type)) return type.some((item) => matchesType(value, item));
+  if (type === "null") return value === null;
   if (type === "array") return Array.isArray(value);
   if (type === "object") return value !== null && typeof value === "object" && !Array.isArray(value);
   if (type === "integer") return Number.isInteger(value);
