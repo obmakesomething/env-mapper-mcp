@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { generateDmnoDraft } from "../src/generate-dmno.js";
 import { generateLlmReviewPacket } from "../src/generate-llm-packet.js";
 import { generateSecretPlan } from "../src/generate-plan.js";
+import { hasJavaScriptAstParser } from "../src/js-ast-detector.js";
 import { scanRepository } from "../src/scanner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -241,7 +242,12 @@ test("scanner ignores comments/strings and flags js dynamic env keys for review"
   ]);
 });
 
-test("scanner uses js ast for destructuring aliases helpers and schema objects", () => {
+test("scanner uses js ast for destructuring aliases helpers and schema objects", (t) => {
+  if (!hasJavaScriptAstParser()) {
+    t.skip("@babel/parser is not installed in this checkout");
+    return;
+  }
+
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
   fs.mkdirSync(path.join(root, "src"));
   fs.writeFileSync(path.join(root, ".env-mapper.json"), JSON.stringify({

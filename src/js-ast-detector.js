@@ -1,11 +1,21 @@
-import { parse } from "@babel/parser";
+import { createRequire } from "node:module";
 
 const DEFAULT_ENV_HELPERS = ["env", "getEnv", "requiredEnv", "config", "readEnv"];
+const require = createRequire(import.meta.url);
+
+let cachedParser;
+
+export function hasJavaScriptAstParser() {
+  return Boolean(loadJavaScriptAstParser());
+}
 
 export function detectJavaScriptAst(text, relPath, options = {}) {
+  const parser = loadJavaScriptAstParser();
+  if (!parser) return null;
+
   let ast;
   try {
-    ast = parse(text, {
+    ast = parser.parse(text, {
       sourceType: "unambiguous",
       errorRecovery: true,
       plugins: ["typescript", "jsx", "importMeta", "topLevelAwait"]
@@ -55,6 +65,16 @@ export function detectJavaScriptAst(text, relPath, options = {}) {
   });
 
   return { findings, dynamicUsages };
+}
+
+function loadJavaScriptAstParser() {
+  if (cachedParser !== undefined) return cachedParser;
+  try {
+    cachedParser = require("@babel/parser");
+  } catch {
+    cachedParser = null;
+  }
+  return cachedParser;
 }
 
 function collectEnvMember(node, aliases, findings, dynamicUsages, seenFindings, seenDynamic, relPath) {
