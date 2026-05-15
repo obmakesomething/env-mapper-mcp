@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { generateDmnoDraft } from "../src/generate-dmno.js";
 import { generateLlmReviewPacket } from "../src/generate-llm-packet.js";
 import { generateSecretPlan } from "../src/generate-plan.js";
+import { hasJavaScriptAstParser } from "../src/js-ast-detector.js";
 import { scanRepository } from "../src/scanner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -240,6 +241,62 @@ test("scanner ignores comments/strings and flags js dynamic env keys for review"
     "process.env.bracket.dynamic"
   ]);
 });
+
+test("scanner uses js ast for destructuring aliases helpers and schema objects", (t) => {
+  if (!hasJavaScriptAstParser()) {
+    t.skip("@babel/parser is not installed in this checkout");
+    return;
+  }
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, ".env-mapper.json"), JSON.stringify({
+    envHelpers: ["mustEnv"]
+  }), "utf8");
+  fs.writeFileSync(
+    path.join(root, "src", "env.tsx"),
+    [
+      "const { DATABASE_URL, NEXT_PUBLIC_APP_URL: appUrl, OPTIONAL_FLAG = 'off' } = process.env;",
+      "const env = process.env;",
+      "const runtimeEnv = import.meta.env;",
+      "const bunEnv = Bun.env;",
+      "env.STRIPE_SECRET_KEY;",
+      "env['OPENAI_API_KEY'];",
+      "runtimeEnv.VITE_API_URL;",
+      "bunEnv[`BUN_STATIC_KEY`];",
+      "requiredEnv('REQUIRED_HELPER_TOKEN');",
+      "mustEnv('CUSTOM_HELPER_TOKEN');",
+      "const dynamic = env[prefix + name];",
+      "const denoDynamic = Deno.env.get(runtimeKey);",
+      "cleanEnv(process.env, { CLEAN_ENV_TOKEN: str(), CLEAN_ENV_URL: url() });",
+      "const ignoredString = 'process.env.STRING_ONLY_TOKEN';",
+      "// process.env.COMMENT_ONLY_TOKEN"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const report = scanRepository(root);
+  const names = report.variables.map((item) => item.name).sort();
+  const dynamicPatterns = report.dynamicUsages.map((item) => item.pattern).sort();
+
+  assert.deepEqual(names, [
+    "BUN_STATIC_KEY",
+    "CLEAN_ENV_TOKEN",
+    "CLEAN_ENV_URL",
+    "CUSTOM_HELPER_TOKEN",
+    "DATABASE_URL",
+    "NEXT_PUBLIC_APP_URL",
+    "OPENAI_API_KEY",
+    "OPTIONAL_FLAG",
+    "REQUIRED_HELPER_TOKEN",
+    "STRIPE_SECRET_KEY",
+    "VITE_API_URL"
+  ]);
+  assert.deepEqual(dynamicPatterns, ["Deno.env.get.dynamic", "process.env.bracket.dynamic"]);
+  assert.equal(JSON.stringify(report).includes("STRING_ONLY_TOKEN"), false);
+  assert.equal(JSON.stringify(report).includes("COMMENT_ONLY_TOKEN"), false);
+});
+
 
 test("scanner ignores JS regex literals while preserving common process env keys", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));

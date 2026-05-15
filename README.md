@@ -52,7 +52,8 @@ leaked secret values, or mutate providers.
 Requirements:
 
 - Node.js 20+
-- no runtime package install required
+- package dependencies are installed automatically when using `npx` or the
+  published package
 
 Run the published package directly:
 
@@ -72,6 +73,7 @@ Clone and scan a repository:
 ```bash
 git clone https://github.com/obmakesomething/env-mapper-mcp.git
 cd env-mapper-mcp
+npm install
 node src/cli.js scan --root /path/to/repo --emit all --format json
 ```
 
@@ -102,6 +104,7 @@ env-mapper scan --root . --emit dmno --format text
 env-mapper scan --root . --emit plan --provider infisical --format json
 env-mapper scan --root . --emit llm --format json
 env-mapper scan --root . --emit all --format json
+env-mapper diff --root . --base origin/main --format text
 env-mapper mcp
 ```
 
@@ -111,6 +114,7 @@ Options:
 - `--emit report|dmno|plan|llm|all`: output target
 - `--format json|text`: output format
 - `--provider <name>`: provider name for dry-run plan metadata
+- `--config <path>`: optional config file path
 
 The scanner reads files to find variable names, but it does not print secret
 values. Env-file values are reduced to presence metadata.
@@ -196,12 +200,17 @@ Code usage:
 - `process.env.KEY`
 - `process.env["KEY"]`
 - `process.env[KEY]` where dynamic keys become `dynamic-usage` review items
+- `const { KEY } = process.env`
+- `const env = process.env; env.KEY`
 - `import.meta.env.KEY`
 - `import.meta.env[KEY]` where dynamic forms are review candidates
 - `Deno.env.get("KEY")`
 - `Deno.env.get(VAR)` where dynamic forms are review candidates
 - `Bun.env.KEY`
 - `Bun.env[KEY]` where dynamic forms are review candidates
+- helper calls such as `env("KEY")`, `getEnv("KEY")`, `requiredEnv("KEY")`,
+  `config("KEY")`, and configured helper names
+- schema objects such as `cleanEnv(process.env, { KEY: str() })`
 
 Config and docs references:
 
