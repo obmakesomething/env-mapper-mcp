@@ -1,11 +1,23 @@
-# Env Mapper MCP
+# Env Mapper: AI-safe Environment Config Audit
 
 [![Test](https://github.com/obmakesomething/env-mapper-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/obmakesomething/env-mapper-mcp/actions/workflows/test.yml)
 
-Read-only env var mapping for teams that want to connect code, DMNO, secret
-stores, GitHub Actions, and LLM review without exposing secret values.
+Env Mapper is an AI-safe Environment Config Audit tool. It maps environment
+configuration names, declarations, source locations, classifications, and review
+questions so humans and coding agents can reason about config drift without
+reading secret values.
 
-Env Mapper MCP is a zero-dependency Node.js CLI, GitHub Action, and MCP server.
+Env Mapper is not a secret scanner. It does not detect leaked secret values,
+entropy patterns, private keys, tokens, or credential material. Use Gitleaks,
+TruffleHog, GitHub secret scanning, or provider-specific controls for leaked
+secret detection.
+
+Delivery channels are:
+
+- CLI for local and CI scans
+- GitHub Action for pull request audit summaries
+- MCP server for agent-readable, redacted audit packets
+
 It scans a repository for environment variable usage, then produces:
 
 - a redacted JSON inventory
@@ -17,7 +29,7 @@ It scans a repository for environment variable usage, then produces:
 It is built for the messy middle between code and secret managers: code uses
 `process.env.FOO`, CI references `${FOO}`, `.env.example` lists `FOO=`, and
 teams still have to keep DMNO, Infisical, 1Password, Doppler, Vault-like
-stores, and platform secrets aligned. Env Mapper MCP creates the reviewable map
+stores, and platform secrets aligned. Env Mapper creates the reviewable map
 first.
 
 ## Why It Exists
@@ -31,9 +43,9 @@ show up:
 - dynamic env access hides concrete ownership from reviewers
 - secret-store migrations need a plan before provider writes are safe
 
-Env Mapper MCP keeps the first pass read-only. It reports names, source
-locations, classifications, and review questions. It does not print secret
-values or mutate providers.
+Env Mapper keeps the first pass read-only. It reports names, source locations,
+classifications, and review questions. It does not print secret values, detect
+leaked secret values, or mutate providers.
 
 ## Quick Start
 
@@ -103,7 +115,11 @@ Options:
 The scanner reads files to find variable names, but it does not print secret
 values. Env-file values are reduced to presence metadata.
 
-## MCP Server
+Variable names, file paths, line numbers, and provider names can still be
+sensitive metadata. Treat audit output as internal engineering evidence, not as
+a public artifact.
+
+## MCP Delivery Channel
 
 Start the stdio server:
 
@@ -136,6 +152,10 @@ When developing from a source checkout, use:
   "args": ["/absolute/path/to/env-mapper-mcp/src/cli.js", "mcp"]
 }
 ```
+
+The MCP server is one delivery channel for the same redacted audit surfaces that
+the CLI and GitHub Action use. It is intended for agent workflows that need
+structured environment config context without secret values.
 
 The server implements the MCP stdio JSON-RPC lifecycle directly so the project
 remains usable without package-manager setup. Future releases can swap in the
@@ -203,7 +223,7 @@ through `.gitignore`; if scanned explicitly, values are still redacted.
 
 ## Default Ignores
 
-Env Mapper MCP skips common generated, dependency, and local-work directories by
+Env Mapper skips common generated, dependency, and local-work directories by
 default, including:
 
 - VCS dirs such as `.git`
@@ -235,19 +255,36 @@ The packet contains:
 See [docs/llm-integration.md](docs/llm-integration.md) for the safe prompt
 pattern.
 
+## What It Complements
+
+Env Mapper is a config-audit map, not the whole secret-management stack.
+
+| Tool category | Owns | Env Mapper role |
+| --- | --- | --- |
+| Gitleaks, TruffleHog | leaked secret value detection | complements with env name, declaration, and usage audit |
+| GitHub secret scanning | platform-side leaked secret alerts | complements with PR env drift summaries |
+| Doppler, Infisical | secret storage and access workflows | produces dry-run sync plans, not live writes |
+| DMNO | typed env schema and runtime validation | drafts schema candidates from repo evidence |
+| dotenv-linter | `.env` file syntax and consistency checks | maps cross-file usage, declarations, and review questions |
+
+See [docs/comparison.md](docs/comparison.md) for concise positioning details.
+
 ## Security Model
 
-Env Mapper MCP is read-only by default.
+Env Mapper is read-only by default.
 
 - It reports variable names, source locations, and presence metadata.
 - It never prints raw env-file values.
 - It generates provider sync plans, not live mutations.
 - It does not claim complete secret-scanning coverage.
+- It does not detect leaked secret values.
+- It treats variable names and file paths as sensitive metadata.
 - Any future `apply` mode must require explicit human approval and provider
   authentication outside the model context.
 
 See [docs/security.md](docs/security.md) and
-[docs/provider-contract.md](docs/provider-contract.md).
+[docs/provider-contract.md](docs/provider-contract.md). See
+[docs/limitations.md](docs/limitations.md) for scope boundaries.
 
 ## Development
 
