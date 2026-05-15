@@ -1,5 +1,5 @@
-export function buildGithubAudit(report) {
-  const markdown = formatGithubAuditMarkdown(report);
+export function buildGithubAudit(report, options = {}) {
+  const markdown = formatGithubAuditMarkdown(report, options);
   return {
     mode: "github-audit",
     schemaVersion: report.schemaVersion,
@@ -14,7 +14,8 @@ export function buildGithubAudit(report) {
   };
 }
 
-export function formatGithubAuditMarkdown(report) {
+export function formatGithubAuditMarkdown(report, options = {}) {
+  const maxFindings = options.maxFindings;
   const missing = report.variables.filter((item) => item.missingDeclaration);
   const unused = report.variables.filter((item) => item.unusedDeclaration);
   const review = report.variables.filter((item) => item.needsReview);
@@ -35,15 +36,15 @@ export function formatGithubAuditMarkdown(report) {
     "",
     "> Secret values are not included. Evidence is limited to variable names, source files, line numbers, and detector patterns.",
     "",
-    section("Missing Declarations", missing, "No missing declarations found."),
+    section("Missing Declarations", missing, "No missing declarations found.", maxFindings),
     "",
-    section("Unused Declarations", unused, "No unused declarations found."),
+    section("Unused Declarations", unused, "No unused declarations found.", maxFindings),
     "",
-    section("Public/Secret Review Candidates", review, "No public/secret conflicts found."),
+    section("Public/Secret Review Candidates", review, "No public/secret conflicts found.", maxFindings),
     "",
-    section("Secret Candidates", secretCandidates, "No secret candidates found."),
+    section("Secret Candidates", secretCandidates, "No secret candidates found.", maxFindings),
     "",
-    section("Public Config Candidates", publicCandidates, "No public config candidates found.")
+    section("Public Config Candidates", publicCandidates, "No public config candidates found.", maxFindings)
   ];
 
   if (report.warnings.length > 0) {
@@ -54,20 +55,22 @@ export function formatGithubAuditMarkdown(report) {
   return `${lines.join("\n")}\n`;
 }
 
-function section(title, variables, emptyMessage) {
+function section(title, variables, emptyMessage, maxFindings) {
   const lines = [`### ${title}`, ""];
   if (variables.length === 0) {
     lines.push(`- ${emptyMessage}`);
     return lines.join("\n");
   }
 
-  for (const variable of variables) {
+  const visibleVariables = maxFindings ? variables.slice(0, maxFindings) : variables;
+  for (const variable of visibleVariables) {
     lines.push(
       `- \`${variable.name}\` ${badge(variable.visibility)} ${badge(variable.sensitivity)} required=${variable.required ? "yes" : "no"}`
     );
     lines.push(`  - Evidence: ${formatEvidence(variable.sources)}`);
     if (variable.notes.length > 0) lines.push(`  - Notes: ${variable.notes.map(escapeMarkdown).join(" ")}`);
   }
+  if (visibleVariables.length < variables.length) lines.push(`- ${variables.length - visibleVariables.length} more omitted by max-findings.`);
 
   return lines.join("\n");
 }

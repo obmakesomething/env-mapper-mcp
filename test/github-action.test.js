@@ -131,6 +131,80 @@ test("github action appends step summary with a blank-line separator", () => {
   assert.equal(fs.readFileSync(stepSummary, "utf8").startsWith("Existing summary\n\n## Env Mapper MCP audit"), true);
 });
 
+test("github action writes json artifact and fails on new missing declaration", () => {
+  const baseRoot = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-action-base-"));
+  const headRoot = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-action-head-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-action-gate-"));
+  const githubOutput = path.join(tempDir, "github-output.txt");
+  const markdownOutput = path.join(tempDir, "audit.md");
+  const jsonOutput = path.join(tempDir, "audit.json");
+  const baselinePath = path.join(tempDir, "baseline.json");
+  fs.mkdirSync(path.join(baseRoot, "src"));
+  fs.mkdirSync(path.join(headRoot, "src"));
+  fs.writeFileSync(path.join(baseRoot, "src", "index.js"), "process.env.EXISTING_TOKEN;\n", "utf8");
+  fs.writeFileSync(path.join(headRoot, "src", "index.js"), "process.env.EXISTING_TOKEN;\nprocess.env.NEW_API_TOKEN;\n", "utf8");
+  fs.writeFileSync(baselinePath, JSON.stringify(scanRepository(baseRoot)), "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      "src/github-action.js",
+      "--root",
+      headRoot,
+      "--baseline",
+      baselinePath,
+      "--fail-on",
+      "new-missing-declaration",
+      "--output",
+      markdownOutput,
+      "--json-output",
+      jsonOutput,
+      "--output-format",
+      "all",
+      "--annotations",
+      "true",
+      "--max-findings",
+      "1"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: githubOutput
+      }
+    }
+  );
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Env Mapper gate failed/);
+  assert.match(result.stdout, /::error file=src\/index\.js,line=2::NEW_API_TOKEN/);
+  assert.match(fs.readFileSync(markdownOutput, "utf8"), /1 more omitted by max-findings/);
+  const json = JSON.parse(fs.readFileSync(jsonOutput, "utf8"));
+  assert.equal(json.diff.summary.newlyMissingDeclarations, 1);
+  const outputs = fs.readFileSync(githubOutput, "utf8");
+  assert.match(outputs, /json_path<</);
+  assert.match(outputs, /new_missing_declarations<<.*\n1\n/s);
+  for (const output of [result.stdout, result.stderr, outputs, JSON.stringify(json)]) {
+    assert.equal(output.includes("postgres://"), false);
+    assert.equal(output.includes("sk_test_secret_value"), false);
+  }
+});
+
+test("github action passes new finding gate when baseline has no new high findings", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-action-pass-"));
+  const baselinePath = path.join(tempDir, "baseline.json");
+  fs.writeFileSync(baselinePath, JSON.stringify(scanRepository(fixtureRoot)), "utf8");
+
+  const result = spawnSync(
+    process.execPath,
+    ["src/github-action.js", "--root", fixtureRoot, "--baseline", baselinePath, "--fail-on", "new-high"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test("github formatter escapes evidence fields for markdown comments", () => {
   const markdown = formatGithubAuditMarkdown({
     filesScanned: 1,

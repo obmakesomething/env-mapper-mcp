@@ -11,18 +11,56 @@ inputs:
     description: Optional path to write the Markdown audit summary.
     required: false
     default: ""
+  json-output:
+    description: Optional path to write the redacted JSON audit artifact.
+    required: false
+    default: ""
+  fail-on:
+    description: Gate policy: none, missing-declaration, public-secret-conflict, high, new-high, or new-missing-declaration.
+    required: false
+    default: "none"
+  baseline:
+    description: Optional git ref or baseline report JSON path for new-finding gates.
+    required: false
+    default: ""
+  output-format:
+    description: Output format to write: markdown, json, or all.
+    required: false
+    default: "markdown"
+  annotations:
+    description: Whether to emit GitHub workflow annotations for findings.
+    required: false
+    default: "false"
+  max-findings:
+    description: Optional maximum variables to show per Markdown section.
+    required: false
+    default: ""
 
 outputs:
   markdown:
     description: Redacted Markdown env audit summary.
   markdown_path:
     description: Path to the written Markdown summary, when output was provided.
+  json:
+    description: Redacted JSON audit payload, when output-format includes json.
+  json_path:
+    description: Path to the written JSON audit artifact, when json-output was provided.
   missing_declarations:
     description: Count of variables used without env-file declaration or provider reference.
   unused_declarations:
     description: Count of declarations without direct code usage.
   review_candidates:
     description: Count of variables needing public/secret review.
+  findings:
+    description: Count of findings in the current report.
+  new_findings:
+    description: Count of new findings compared with the baseline.
+  new_high_findings:
+    description: Count of new high-severity findings compared with the baseline.
+  new_missing_declarations:
+    description: Count of new missing declarations compared with the baseline.
+  new_public_secret_conflicts:
+    description: Count of new public/secret conflicts compared with the baseline.
 
 runs:
   using: node20
