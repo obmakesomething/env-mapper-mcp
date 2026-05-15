@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://env-mapper-mcp.local/schemas/github-audit.schema.json",
+  "title": "Env Mapper GitHub Audit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "schemaVersion",
+    "toolVersion",
+    "version",
+    "generatedAt",
+    "root",
+    "summary",
+    "containsSecretValues",
+    "findings",
+    "markdown"
+  ],
+  "properties": {
+    "mode": { "const": "github-audit" },
+    "schemaVersion": { "const": "0.1" },
+    "toolVersion": { "type": "string" },
+    "version": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "root": { "type": "string" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variables",
+        "missingDeclarations",
+        "unusedDeclarations",
+        "secretCandidates",
+        "reviewCandidates",
+        "dynamicUsageCandidates",
+        "findings"
+      ],
+      "properties": {
+        "variables": { "type": "integer", "minimum": 0 },
+        "missingDeclarations": { "type": "integer", "minimum": 0 },
+        "unusedDeclarations": { "type": "integer", "minimum": 0 },
+        "secretCandidates": { "type": "integer", "minimum": 0 },
+        "reviewCandidates": { "type": "integer", "minimum": 0 },
+        "dynamicUsageCandidates": { "type": "integer", "minimum": 0 },
+        "findings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "containsSecretValues": { "const": false },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "markdown": { "type": "string" }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "severity", "variable", "message", "evidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": {
+          "enum": [
+            "missing-declaration",
+            "unused-in-code",
+            "declared-only",
+            "public-secret-conflict",
+            "dynamic-env-access",
+            "unknown-sensitivity",
+            "provider-reference-without-declaration"
+          ]
+        },
+        "severity": { "enum": ["high", "medium", "low", "info"] },
+        "variable": { "type": "string" },
+        "message": { "type": "string" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/source" } }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "file", "line", "pattern"],
+      "properties": {
+        "kind": {
+          "enum": ["declaration", "usage", "reference", "provider-reference", "dynamic-usage"]
+        },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "pattern": { "type": "string" }
+      }
+    }
+  }
+}

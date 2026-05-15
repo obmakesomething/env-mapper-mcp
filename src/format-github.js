@@ -1,3 +1,19 @@
+export function buildGithubAudit(report) {
+  const markdown = formatGithubAuditMarkdown(report);
+  return {
+    mode: "github-audit",
+    schemaVersion: report.schemaVersion,
+    toolVersion: report.toolVersion,
+    version: report.version,
+    generatedAt: report.generatedAt,
+    root: report.root,
+    summary: report.totals,
+    containsSecretValues: false,
+    findings: report.findings || [],
+    markdown
+  };
+}
+
 export function formatGithubAuditMarkdown(report) {
   const missing = report.variables.filter((item) => item.missingDeclaration);
   const unused = report.variables.filter((item) => item.unusedDeclaration);

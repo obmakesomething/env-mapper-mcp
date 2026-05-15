@@ -18,11 +18,18 @@ test("scanner maps usage, declarations, and provider references without values",
   const report = scanRepository(fixtureRoot);
   const byName = new Map(report.variables.map((item) => [item.name, item]));
 
+  assert.equal(report.schemaVersion, "0.1");
+  assert.equal(report.toolVersion, report.version);
+  assert.ok(Array.isArray(report.findings));
   assert.equal(byName.get("DATABASE_URL").sensitivity, "secret");
   assert.equal(byName.get("DATABASE_URL").missingDeclaration, false);
   assert.equal(byName.get("NEXT_PUBLIC_APP_URL").visibility, "public");
   assert.equal(byName.get("MISSING_API_TOKEN").missingDeclaration, true);
+  assert.equal(byName.get("MISSING_API_TOKEN").findings[0].kind, "missing-declaration");
+  assert.match(byName.get("MISSING_API_TOKEN").findings[0].id, /^fnd_[a-z0-9]+$/);
   assert.equal(byName.get("UNUSED_LEGACY_TOKEN").unusedDeclaration, true);
+  assert.equal(byName.get("UNUSED_LEGACY_TOKEN").findings[0].kind, "declared-only");
+  assert.ok(report.findings.find((finding) => finding.variable === "UNUSED_LEGACY_TOKEN"));
 
   const serialized = JSON.stringify(report);
   assert.equal(serialized.includes("postgres://"), false);
@@ -127,6 +134,7 @@ test("scanner ignores comments/strings and flags js dynamic env keys for review"
     "TEMPLATE_EXPR_REAL"
   ]);
   assert.equal(report.totals.dynamicUsageCandidates, 4);
+  assert.equal(report.findings.filter((finding) => finding.kind === "dynamic-env-access").length, 4);
   assert.deepEqual(dynamicPatterns, [
     "Bun.env.bracket.dynamic",
     "Deno.env.get.dynamic",
@@ -177,9 +185,11 @@ test("secret plan is dry-run and contains no apply support", () => {
   const plan = generateSecretPlan(report, "infisical");
 
   assert.equal(plan.mode, "dry-run");
+  assert.equal(plan.schemaVersion, "0.1");
   assert.equal(plan.actions.some((action) => action.applySupported), false);
   assert.ok(plan.actions.find((action) => action.key === "DATABASE_URL"));
   assert.equal(plan.actions.find((action) => action.key === "UNUSED_LEGACY_TOKEN").action, "mark_unused_candidate");
+  assert.ok(plan.actions.find((action) => action.key === "UNUSED_LEGACY_TOKEN").findingIds.length > 0);
 });
 
 test("scan cli emits redacted output", () => {
@@ -229,10 +239,10 @@ test("llm packet includes dynamic env access review candidates", () => {
 
   const report = scanRepository(root);
   const packet = generateLlmReviewPacket(report);
-  const dynamicReviewItem = packet.reviewItems.find((item) => item.kind === "dynamic-usage");
+  const dynamicReviewItem = packet.reviewItems.find((item) => item.kind === "dynamic-env-access");
 
   assert.equal(packet.summary.dynamicUsageCandidates, 1);
-  assert.equal(dynamicReviewItem.kind, "dynamic-usage");
+  assert.equal(dynamicReviewItem.kind, "dynamic-env-access");
   assert.equal(dynamicReviewItem.variable, "DYNAMIC_ENV_KEY");
   assert.equal(dynamicReviewItem.evidence[0].pattern, "Bun.env.bracket.dynamic");
 });
@@ -242,6 +252,7 @@ test("llm packet provides redacted review items", () => {
   const packet = generateLlmReviewPacket(report);
 
   assert.equal(packet.mode, "redacted-llm-review-packet");
+  assert.equal(packet.schemaVersion, "0.1");
   assert.equal(packet.safety.containsSecretValues, false);
   assert.equal(packet.safety.mayMutateProviders, false);
   assert.ok(packet.reviewItems.find((item) => item.variable === "MISSING_API_TOKEN"));
