@@ -1,6 +1,7 @@
 import { generateDmnoDraft } from "./generate-dmno.js";
 import { generateLlmReviewPacket } from "./generate-llm-packet.js";
 import { generateSecretPlan } from "./generate-plan.js";
+import { buildSarif } from "./format-sarif.js";
 
 export function buildEmission(report, options = {}) {
   const emit = options.emit || "report";
@@ -9,6 +10,7 @@ export function buildEmission(report, options = {}) {
   if (emit === "dmno") return { file: ".dmno/config.mts", content: generateDmnoDraft(report) };
   if (emit === "plan") return generateSecretPlan(report, provider);
   if (emit === "llm") return generateLlmReviewPacket(report);
+  if (emit === "sarif") return buildSarif(report, options);
   if (emit === "all") {
     return {
       report,
@@ -17,7 +19,8 @@ export function buildEmission(report, options = {}) {
         content: generateDmnoDraft(report)
       },
       plan: generateSecretPlan(report, provider),
-      llm: generateLlmReviewPacket(report)
+      llm: generateLlmReviewPacket(report),
+      sarif: buildSarif(report, options)
     };
   }
   throw new Error(`Unknown emit target: ${emit}`);
@@ -31,6 +34,7 @@ export function formatEmission(emission, format = "json") {
   if (emission.actions) return formatPlanText(emission);
   if (emission.mode === "redacted-llm-review-packet") return formatLlmPacketText(emission);
   if (emission.mode === "env-mapper-diff") return formatDiffText(emission);
+  if (emission.version === "2.1.0" && Array.isArray(emission.runs)) return `${JSON.stringify(emission, null, 2)}\n`;
   if (emission.report && emission.dmno && emission.plan) return formatAllText(emission);
   return formatReportText(emission);
 }

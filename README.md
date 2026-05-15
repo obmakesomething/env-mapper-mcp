@@ -2,7 +2,8 @@
 
 [![Test](https://github.com/obmakesomething/env-mapper-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/obmakesomething/env-mapper-mcp/actions/workflows/test.yml)
 
-Env Mapper is an AI-safe Environment Config Audit tool. It maps environment
+Env Mapper is an AI-safe Environment Config Audit tool and read-only config graph
+for coding agents. It maps environment
 configuration names, declarations, source locations, classifications, and review
 questions so humans and coding agents can reason about config drift without
 reading secret values.
@@ -25,6 +26,7 @@ It scans a repository for environment variable usage, then produces:
 - a dry-run secret-store sync plan
 - a redacted LLM review packet
 - a pull request env audit summary
+- a SARIF code scanning artifact
 
 It is built for the messy middle between code and secret managers: code uses
 `process.env.FOO`, CI references `${FOO}`, `.env.example` lists `FOO=`, and
@@ -46,6 +48,10 @@ show up:
 Env Mapper keeps the first pass read-only. It reports names, source locations,
 classifications, and review questions. It does not print secret values, detect
 leaked secret values, or mutate providers.
+
+See [docs/config-graph.md](docs/config-graph.md) for the longer product
+direction: a read-only config graph and safe config context layer for AI coding
+agents.
 
 ## Quick Start
 
@@ -103,6 +109,7 @@ env-mapper scan --root . --emit report --format json
 env-mapper scan --root . --emit dmno --format text
 env-mapper scan --root . --emit plan --provider infisical --format json
 env-mapper scan --root . --emit llm --format json
+env-mapper scan --root . --emit sarif --format json
 env-mapper scan --root . --emit all --format json
 env-mapper diff --root . --base origin/main --format text
 env-mapper mcp
@@ -111,7 +118,7 @@ env-mapper mcp
 Options:
 
 - `--root <path>`: repository or service root to scan
-- `--emit report|dmno|plan|llm|all`: output target
+- `--emit report|dmno|plan|llm|sarif|all`: output target
 - `--format json|text`: output format
 - `--provider <name>`: provider name for dry-run plan metadata
 - `--config <path>`: optional config file path

@@ -6,7 +6,7 @@ import { buildDiff } from "./diff.js";
 import { startMcpServer, runCliScan } from "./mcp-server.js";
 
 const USAGE = `Usage:
-  env-mapper scan --root <path> [--config <path>] [--emit report|dmno|plan|llm|all] [--format json|text] [--provider infisical]
+  env-mapper scan --root <path> [--config <path>] [--emit report|dmno|plan|llm|sarif|all] [--format json|text] [--provider infisical]
   env-mapper diff --root <path> --base <git-ref-or-report-json> [--head <git-ref-or-report-json>] [--config <path>] [--format json|text]
   env-mapper mcp [--config <path>]
 
@@ -16,6 +16,7 @@ Examples:
   env-mapper diff --root . --base origin/main --format text
   env-mapper scan --root . --emit dmno --format text
   env-mapper scan --root . --emit llm --format json
+  env-mapper scan --root . --emit sarif --format json
   env-mapper mcp
 `;
 

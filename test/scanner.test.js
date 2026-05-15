@@ -367,6 +367,24 @@ test("scan cli emits redacted output", () => {
   assert.equal(output.llm.mode, "redacted-llm-review-packet");
 });
 
+test("scan cli emits redacted sarif output", () => {
+  const result = spawnSync(
+    process.execPath,
+    ["src/cli.js", "scan", "--root", fixtureRoot, "--emit", "sarif", "--format", "json"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8"
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const sarif = JSON.parse(result.stdout);
+  assert.equal(sarif.version, "2.1.0");
+  assert.ok(sarif.runs[0].results.find((item) => item.ruleId === "missing-declaration"));
+  assert.equal(result.stdout.includes("postgres://"), false);
+  assert.equal(result.stdout.includes("sk_test_secret_value"), false);
+});
+
 test("scan cli runs through an npm-style bin symlink", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-bin-"));
   const binPath = path.join(tempDir, "env-mapper");

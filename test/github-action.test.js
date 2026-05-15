@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { formatGithubAuditMarkdown } from "../src/format-github.js";
+import { buildSarif } from "../src/format-sarif.js";
 import { scanRepository } from "../src/scanner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,24 @@ test("github formatter emits redacted PR audit markdown with evidence", () => {
   assert.match(markdown, /Public Config Candidates/);
   assert.equal(markdown.includes("postgres://"), false);
   assert.equal(markdown.includes("sk_test_secret_value"), false);
+});
+
+test("sarif formatter emits redacted code scanning results", () => {
+  const sarif = buildSarif(scanRepository(fixtureRoot));
+  const run = sarif.runs[0];
+  const missing = run.results.find((result) => result.ruleId === "missing-declaration");
+
+  assert.equal(sarif.version, "2.1.0");
+  assert.equal(run.tool.driver.name, "Env Mapper MCP");
+  assert.ok(run.tool.driver.rules.find((rule) => rule.id === "missing-declaration"));
+  assert.equal(run.invocations[0].properties.secretValuesIncluded, false);
+  assert.equal(run.properties.secretValuesIncluded, false);
+  assert.equal(missing.level, "error");
+  assert.equal(missing.locations[0].physicalLocation.artifactLocation.uri, "src/app.js");
+  assert.equal(missing.locations[0].physicalLocation.region.startLine, 3);
+  assert.equal(missing.properties.safeForAgent, true);
+  assert.equal(JSON.stringify(sarif).includes("postgres://"), false);
+  assert.equal(JSON.stringify(sarif).includes("sk_test_secret_value"), false);
 });
 
 test("github action writes summary, outputs, and optional markdown file without leaking values", () => {
@@ -186,6 +205,45 @@ test("github action writes json artifact and fails on new missing declaration", 
   assert.match(outputs, /json_path<</);
   assert.match(outputs, /new_missing_declarations<<.*\n1\n/s);
   for (const output of [result.stdout, result.stderr, outputs, JSON.stringify(json)]) {
+    assert.equal(output.includes("postgres://"), false);
+    assert.equal(output.includes("sk_test_secret_value"), false);
+  }
+});
+
+test("github action writes sarif artifact and output without leaking values", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-action-sarif-"));
+  const githubOutput = path.join(tempDir, "github-output.txt");
+  const sarifOutput = path.join(tempDir, "env-mapper.sarif");
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      "src/github-action.js",
+      "--root",
+      fixtureRoot,
+      "--sarif-output",
+      sarifOutput,
+      "--output-format",
+      "sarif"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: githubOutput
+      }
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const sarif = JSON.parse(fs.readFileSync(sarifOutput, "utf8"));
+  const outputs = fs.readFileSync(githubOutput, "utf8");
+  assert.equal(sarif.version, "2.1.0");
+  assert.ok(sarif.runs[0].results.find((item) => item.ruleId === "missing-declaration"));
+  assert.match(outputs, /sarif_path<</);
+  assert.match(outputs, /sarif<</);
+  for (const output of [JSON.stringify(sarif), outputs, result.stderr]) {
     assert.equal(output.includes("postgres://"), false);
     assert.equal(output.includes("sk_test_secret_value"), false);
   }

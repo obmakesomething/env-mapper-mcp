@@ -106,6 +106,39 @@ jobs:
           max-findings: 25
 ```
 
+## SARIF Code Scanning
+
+The action can also write a redacted SARIF artifact for GitHub code scanning.
+SARIF contains rule ids, finding messages, file paths, line numbers, detector
+patterns, and safe metadata only. Secret values are not read or included.
+
+```yaml
+name: Env audit
+
+on:
+  pull_request:
+
+jobs:
+  env-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: your-org/env-mapper-mcp@v0
+        with:
+          root: .
+          sarif-output: env-mapper.sarif
+          output-format: sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: env-mapper.sarif
+```
+
+Use `output-format: all` when you want Markdown, JSON, and SARIF artifacts from
+the same action run.
+
 Supported `fail-on` values:
 
 - `none`
@@ -121,6 +154,8 @@ Supported `fail-on` values:
 - `markdown_path`: absolute path to the written summary when `output` is set
 - `json`: redacted JSON audit payload when `output-format` includes JSON
 - `json_path`: absolute path to the written JSON artifact when `json-output` is set
+- `sarif`: redacted SARIF payload when `output-format` includes SARIF
+- `sarif_path`: absolute path to the written SARIF artifact when `sarif-output` is set
 - `missing_declarations`: count of variables used without a declaration or provider reference
 - `unused_declarations`: count of declarations without direct code usage
 - `review_candidates`: count of public variables that look secret-like
