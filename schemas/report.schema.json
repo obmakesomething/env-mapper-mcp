@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://env-mapper-mcp.local/schemas/report.schema.json",
+  "title": "Env Mapper Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "version",
+    "root",
+    "generatedAt",
+    "filesScanned",
+    "totals",
+    "variables",
+    "findings",
+    "dynamicUsages",
+    "warnings"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "0.1" },
+    "toolVersion": { "type": "string" },
+    "version": { "type": "string" },
+    "root": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "filesScanned": { "type": "integer", "minimum": 0 },
+    "totals": { "$ref": "#/$defs/totals" },
+    "variables": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/variable" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "dynamicUsages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variables",
+        "missingDeclarations",
+        "unusedDeclarations",
+        "secretCandidates",
+        "reviewCandidates",
+        "dynamicUsageCandidates",
+        "findings"
+      ],
+      "properties": {
+        "variables": { "type": "integer", "minimum": 0 },
+        "missingDeclarations": { "type": "integer", "minimum": 0 },
+        "unusedDeclarations": { "type": "integer", "minimum": 0 },
+        "secretCandidates": { "type": "integer", "minimum": 0 },
+        "reviewCandidates": { "type": "integer", "minimum": 0 },
+        "dynamicUsageCandidates": { "type": "integer", "minimum": 0 },
+        "findings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "visibility",
+        "sensitivity",
+        "required",
+        "missingDeclaration",
+        "unusedDeclaration",
+        "needsReview",
+        "confidence",
+        "usageCount",
+        "declarationCount",
+        "referenceCount",
+        "providerReferenceCount",
+        "sources",
+        "notes",
+        "findings"
+      ],
+      "properties": {
+        "name": { "type": "string" },
+        "visibility": { "enum": ["public", "server"] },
+        "sensitivity": { "enum": ["secret", "public-config", "unknown"] },
+        "required": { "type": "boolean" },
+        "missingDeclaration": { "type": "boolean" },
+        "unusedDeclaration": { "type": "boolean" },
+        "needsReview": { "type": "boolean" },
+        "confidence": { "type": "number", "minimum": 0 },
+        "usageCount": { "type": "integer", "minimum": 0 },
+        "declarationCount": { "type": "integer", "minimum": 0 },
+        "referenceCount": { "type": "integer", "minimum": 0 },
+        "providerReferenceCount": { "type": "integer", "minimum": 0 },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/source" }
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "severity", "variable", "message", "evidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": {
+          "enum": [
+            "missing-declaration",
+            "unused-in-code",
+            "declared-only",
+            "public-secret-conflict",
+            "dynamic-env-access",
+            "unknown-sensitivity",
+            "provider-reference-without-declaration"
+          ]
+        },
+        "severity": { "enum": ["high", "medium", "low", "info"] },
+        "variable": { "type": "string" },
+        "message": { "type": "string" },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/source" }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "file", "line", "pattern"],
+      "properties": {
+        "kind": {
+          "enum": ["declaration", "usage", "reference", "provider-reference", "dynamic-usage"]
+        },
+        "name": { "type": "string" },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "pattern": { "type": "string" },
+        "hasValue": { "type": "boolean" },
+        "value": { "const": "[redacted]" }
+      }
+    }
+  }
+}

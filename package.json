@@ -39,6 +39,7 @@
   "files": [
     "action.yml",
     "src",
+    "schemas",
     "docs",
     "README.md",
     "LICENSE"

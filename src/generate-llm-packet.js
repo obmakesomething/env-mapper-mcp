@@ -1,11 +1,15 @@
+import { REPORT_SCHEMA_VERSION, VERSION } from "./constants.js";
+
 export function generateLlmReviewPacket(report) {
-  const items = report.variables
-    .flatMap((variable) => reviewItemsFor(variable))
-    .concat(dynamicReviewItems(report.dynamicUsages || []))
-    .sort(compareReviewItems);
+  const variablesByName = new Map(report.variables.map((variable) => [variable.name, variable]));
+  const reportFindings = report.findings || legacyFindingsFor(report);
+  const items = reportFindings.map((finding) => reviewItemForFinding(finding, variablesByName)).sort(compareReviewItems);
 
   return {
     mode: "redacted-llm-review-packet",
+    schemaVersion: report.schemaVersion || REPORT_SCHEMA_VERSION,
+    toolVersion: report.toolVersion || VERSION,
+    version: report.version || VERSION,
     generatedAt: report.generatedAt,
     root: report.root,
     purpose: "Help an LLM review env var classification, missing declarations, unused declarations, and sync-plan safety without seeing secret values.",
@@ -36,6 +40,7 @@ export function generateLlmReviewPacket(report) {
     summary: {
       variables: report.totals.variables,
       reviewItems: items.length,
+      findings: reportFindings.length,
       dynamicUsageCandidates: report.totals.dynamicUsageCandidates || 0,
       missingDeclarations: report.totals.missingDeclarations,
       unusedDeclarations: report.totals.unusedDeclarations,
@@ -54,103 +59,82 @@ export function generateLlmReviewPacket(report) {
       referenceCount: variable.referenceCount,
       providerReferenceCount: variable.providerReferenceCount,
       notes: variable.notes,
+      findings: variable.findings || [],
       sources: compactSources(variable)
     }))
   };
 }
 
-function reviewItemsFor(variable) {
-  const items = [];
-  if (variable.missingDeclaration) {
-    items.push(itemFor(variable, "missing-declaration", "high", "Variable is used but no env-file declaration or provider reference was found."));
-  }
-  if (variable.unusedDeclaration) {
-    items.push(itemFor(variable, "unused-declaration", "medium", "Variable is declared but no direct usage was found."));
-  }
-  if (variable.needsReview) {
-    items.push(itemFor(variable, "public-secret-conflict", "high", "Variable has a public prefix but also looks secret-like."));
-  }
-  if (variable.sensitivity === "unknown") {
-    items.push(itemFor(variable, "unknown-sensitivity", "medium", "Variable does not match public or secret naming hints."));
-  }
-  if (variable.confidence < 0.7) {
-    items.push(itemFor(variable, "low-confidence", "low", "Classification confidence is low enough to benefit from human or LLM review."));
-  }
-  return items;
-}
-
-function itemFor(variable, kind, severity, reason) {
+function reviewItemForFinding(finding, variablesByName) {
+  const variable = variablesByName.get(finding.variable);
   return {
-    kind,
-    severity,
-    variable: variable.name,
-    reason,
-    currentClassification: {
-      visibility: variable.visibility,
-      sensitivity: variable.sensitivity,
-      required: variable.required,
-      confidence: variable.confidence
-    },
-    evidence: compactSources(variable),
-    suggestedQuestions: questionsFor(kind, variable)
+    id: finding.id,
+    kind: finding.kind,
+    severity: finding.severity,
+    variable: finding.variable || "DYNAMIC_ENV_KEY",
+    reason: finding.message,
+    currentClassification: currentClassificationFor(variable),
+    evidence: finding.evidence,
+    suggestedQuestions: questionsFor(finding.kind, finding.variable || "DYNAMIC_ENV_KEY")
   };
 }
 
-function dynamicReviewItems(dynamicUsages) {
-  return dynamicUsages.map((source) => ({
-    kind: "dynamic-usage",
-    severity: "medium",
-    variable: "DYNAMIC_ENV_KEY",
-    reason:
-      "An environment access uses a computed key that could not be resolved to a concrete variable name at scan time.",
-    currentClassification: {
+function currentClassificationFor(variable) {
+  if (!variable) {
+    return {
       visibility: "server",
       sensitivity: "unknown",
       required: true,
       confidence: 0.42
-    },
-    evidence: [
-      {
-        kind: source.kind,
-        file: source.file,
-        line: source.line,
-        pattern: source.pattern
-      }
-    ],
-    suggestedQuestions: [
-      "What concrete variable name does this access resolve to in each runtime path?",
-      "Should this be replaced with explicit variable names for better scanner coverage?"
-    ]
-  }));
+    };
+  }
+  return {
+    visibility: variable.visibility,
+    sensitivity: variable.sensitivity,
+    required: variable.required,
+    confidence: variable.confidence
+  };
 }
 
-function questionsFor(kind, variable) {
+function questionsFor(kind, variableName) {
   if (kind === "missing-declaration") {
     return [
-      `Should ${variable.name} be added to .env.example or the DMNO schema?`,
-      `Is ${variable.name} a secret or public config key?`,
-      `Which service or environment owns ${variable.name}?`
+      `Should ${variableName} be added to .env.example or the DMNO schema?`,
+      `Is ${variableName} a secret or public config key?`,
+      `Which service or environment owns ${variableName}?`
     ];
   }
-  if (kind === "unused-declaration") {
+  if (kind === "declared-only" || kind === "unused-in-code") {
     return [
-      `Is ${variable.name} still required by runtime configuration outside the scanned code?`,
-      `Should ${variable.name} stay in the schema as optional or move to a cleanup ticket?`
+      `Is ${variableName} still required by runtime configuration outside the scanned code?`,
+      `Should ${variableName} stay in the schema as optional or move to a cleanup ticket?`
     ];
   }
   if (kind === "public-secret-conflict") {
     return [
-      `Is ${variable.name} safe to expose to client-side code?`,
+      `Is ${variableName} safe to expose to client-side code?`,
       `Should the key be renamed without a public prefix or split into public and server-only values?`
     ];
   }
   if (kind === "unknown-sensitivity") {
     return [
-      `What is the intended sensitivity of ${variable.name}?`,
+      `What is the intended sensitivity of ${variableName}?`,
       `Does the name need a clearer suffix such as _URL, _TOKEN, or _PUBLIC?`
     ];
   }
-  return [`Does ${variable.name} need human review before being added to shared config?`];
+  if (kind === "dynamic-env-access") {
+    return [
+      "What concrete variable name does this access resolve to in each runtime path?",
+      "Should this be replaced with explicit variable names for better scanner coverage?"
+    ];
+  }
+  if (kind === "provider-reference-without-declaration") {
+    return [
+      `Should ${variableName} be declared in the shared env schema?`,
+      `Is the provider reference intentionally outside the scanned app runtime?`
+    ];
+  }
+  return [`Does ${variableName} need human review before being added to shared config?`];
 }
 
 function compactSources(variable) {
@@ -165,4 +149,8 @@ function compactSources(variable) {
 function compareReviewItems(a, b) {
   const rank = { high: 0, medium: 1, low: 2 };
   return rank[a.severity] - rank[b.severity] || a.variable.localeCompare(b.variable) || a.kind.localeCompare(b.kind);
+}
+
+function legacyFindingsFor(report) {
+  return report.variables.flatMap((variable) => variable.findings || []);
 }
