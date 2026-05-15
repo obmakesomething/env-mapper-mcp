@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildGithubAudit, formatGithubAuditMarkdown } from "./format-github.js";
 import { buildDiff } from "./diff.js";
+import { buildSarif } from "./format-sarif.js";
 import { scanRepository } from "./scanner.js";
 
 export function main(argv = process.argv.slice(2), env = process.env) {
@@ -10,6 +11,7 @@ export function main(argv = process.argv.slice(2), env = process.env) {
   const report = scanRepository(options.root);
   const diff = options.baseline ? buildDiff({ root: options.root, base: options.baseline }) : null;
   const markdown = formatGithubAuditMarkdown(report, { maxFindings: options.maxFindings });
+  const sarif = buildSarif(report, { maxFindings: options.maxFindings });
   const gate = evaluateGate(report, diff, options.failOn);
   const audit = {
     ...buildGithubAudit(report, { maxFindings: options.maxFindings }),
@@ -17,6 +19,7 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     gate
   };
   const jsonAudit = JSON.stringify(audit, null, 2);
+  const sarifJson = JSON.stringify(sarif, null, 2);
 
   if (options.output && shouldWriteFormat(options.outputFormat, "markdown")) {
     const outputPath = path.resolve(options.output);
@@ -32,6 +35,13 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     writeOutput("json_path", outputPath, env);
   }
 
+  if (options.sarifOutput && shouldWriteFormat(options.outputFormat, "sarif")) {
+    const outputPath = path.resolve(options.sarifOutput);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, sarifJson, "utf8");
+    writeOutput("sarif_path", outputPath, env);
+  }
+
   if (env.GITHUB_STEP_SUMMARY && shouldWriteFormat(options.outputFormat, "markdown")) {
     appendStepSummary(env.GITHUB_STEP_SUMMARY, markdown);
   }
@@ -40,6 +50,7 @@ export function main(argv = process.argv.slice(2), env = process.env) {
 
   writeOutput("markdown", markdown, env);
   if (shouldWriteFormat(options.outputFormat, "json")) writeOutput("json", jsonAudit, env);
+  if (shouldWriteFormat(options.outputFormat, "sarif")) writeOutput("sarif", sarifJson, env);
   writeOutput("missing_declarations", String(report.totals.missingDeclarations), env);
   writeOutput("unused_declarations", String(report.totals.unusedDeclarations), env);
   writeOutput("review_candidates", String(report.totals.reviewCandidates), env);
@@ -65,6 +76,7 @@ function parseOptions(args, env) {
     root: input(env, "root") || ".",
     output: input(env, "output") || "",
     jsonOutput: input(env, "json-output") || "",
+    sarifOutput: input(env, "sarif-output") || "",
     failOn: input(env, "fail-on") || "none",
     baseline: input(env, "baseline") || "",
     outputFormat: input(env, "output-format") || "markdown",
@@ -77,13 +89,14 @@ function parseOptions(args, env) {
     if (arg === "--root") options.root = requireValue(args, ++i, arg);
     else if (arg === "--output") options.output = requireValue(args, ++i, arg);
     else if (arg === "--json-output") options.jsonOutput = requireValue(args, ++i, arg);
+    else if (arg === "--sarif-output") options.sarifOutput = requireValue(args, ++i, arg);
     else if (arg === "--fail-on") options.failOn = requireValue(args, ++i, arg);
     else if (arg === "--baseline") options.baseline = requireValue(args, ++i, arg);
     else if (arg === "--output-format") options.outputFormat = requireValue(args, ++i, arg);
     else if (arg === "--annotations") options.annotations = parseBoolean(requireValue(args, ++i, arg), false);
     else if (arg === "--max-findings") options.maxFindings = parsePositiveInteger(requireValue(args, ++i, arg));
     else if (arg === "--help" || arg === "-h") {
-      process.stdout.write(`Usage: node src/github-action.js [--root <path>] [--output <path>] [--json-output <path>] [--fail-on <policy>] [--baseline <ref-or-report>] [--output-format markdown|json|all]\n`);
+      process.stdout.write(`Usage: node src/github-action.js [--root <path>] [--output <path>] [--json-output <path>] [--sarif-output <path>] [--fail-on <policy>] [--baseline <ref-or-report>] [--output-format markdown|json|sarif|all]\n`);
       process.exit(0);
     } else {
       throw new Error(`Unknown option: ${arg}`);

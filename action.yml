@@ -15,6 +15,10 @@ inputs:
     description: Optional path to write the redacted JSON audit artifact.
     required: false
     default: ""
+  sarif-output:
+    description: Optional path to write the redacted SARIF code scanning artifact.
+    required: false
+    default: ""
   fail-on:
     description: "Gate policy: none, missing-declaration, public-secret-conflict, high, new-high, or new-missing-declaration."
     required: false
@@ -24,7 +28,7 @@ inputs:
     required: false
     default: ""
   output-format:
-    description: "Output format to write: markdown, json, or all."
+    description: "Output format to write: markdown, json, sarif, or all."
     required: false
     default: "markdown"
   annotations:
@@ -45,6 +49,10 @@ outputs:
     description: Redacted JSON audit payload, when output-format includes json.
   json_path:
     description: Path to the written JSON audit artifact, when json-output was provided.
+  sarif:
+    description: Redacted SARIF payload, when output-format includes sarif.
+  sarif_path:
+    description: Path to the written SARIF artifact, when sarif-output was provided.
   missing_declarations:
     description: Count of variables used without env-file declaration or provider reference.
   unused_declarations:
