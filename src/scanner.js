@@ -2,15 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { REPORT_SCHEMA_VERSION, VERSION } from "./constants.js";
 import { classifyVariable } from "./classify.js";
+import { loadScanConfig, rootSafetyWarnings, scanConfigForReport } from "./config.js";
 import { detectFile } from "./detectors.js";
 import { listScannableFiles } from "./fs-walk.js";
 
-export function scanRepository(rootInput) {
+export function scanRepository(rootInput, options = {}) {
   const root = path.resolve(rootInput || ".");
   validateRoot(root);
-  const files = listScannableFiles(root);
+  const loadedConfig = loadScanConfig(root, options);
+  const scanConfig = loadedConfig.config;
   const byName = new Map();
-  const warnings = [];
+  const warnings = rootSafetyWarnings(root);
+  const files = listScannableFiles(root, scanConfig, warnings);
   let filesScanned = 0;
   const dynamicUsages = [];
 
@@ -33,10 +36,12 @@ export function scanRepository(rootInput) {
     }
   }
 
-  const variables = [...byName.entries()]
+  let variables = [...byName.entries()]
+    .filter(([name]) => !(scanConfig.ignoreKeys || []).includes(name))
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, sources]) => {
-      const classification = classifyVariable(name, sources);
+      const sortedSources = sources.sort(compareSource);
+      const classification = classifyVariable(name, sortedSources, scanConfig);
       const variable = {
         name,
         ...classification,
@@ -44,13 +49,17 @@ export function scanRepository(rootInput) {
         declarationCount: sources.filter((source) => source.kind === "declaration").length,
         referenceCount: sources.filter((source) => source.kind === "reference").length,
         providerReferenceCount: sources.filter((source) => source.kind === "provider-reference").length,
-        sources: sources.sort(compareSource),
+        sources: limitSources(sortedSources, scanConfig, warnings, name),
         notes: notesFor(classification),
         findings: []
       };
       variable.findings = findingsForVariable(variable);
       return variable;
     });
+  if (scanConfig.maxVariables && variables.length > scanConfig.maxVariables) {
+    warnings.push(`Report truncated after maxVariables=${scanConfig.maxVariables}.`);
+    variables = variables.slice(0, scanConfig.maxVariables);
+  }
   const findings = variables
     .flatMap((variable) => variable.findings)
     .concat(dynamicUsages.map(dynamicFindingFor))
@@ -59,6 +68,8 @@ export function scanRepository(rootInput) {
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     toolVersion: VERSION,
+    scanConfigHash: loadedConfig.hash,
+    scanConfig: scanConfigForReport(loadedConfig),
     dynamicUsages,
     version: VERSION,
     root,
@@ -102,6 +113,12 @@ function notesFor(classification) {
   if (classification.needsReview) notes.push("Public prefix combined with secret-like name; verify client exposure.");
   if (classification.sensitivity === "unknown") notes.push("No secret/public hint detected; review intended handling.");
   return notes;
+}
+
+function limitSources(sources, scanConfig, warnings, name) {
+  if (!scanConfig.maxSourcesPerVariable || sources.length <= scanConfig.maxSourcesPerVariable) return sources;
+  warnings.push(`Sources for ${name} truncated after maxSourcesPerVariable=${scanConfig.maxSourcesPerVariable}.`);
+  return sources.slice(0, scanConfig.maxSourcesPerVariable);
 }
 
 function findingsForVariable(variable) {
