@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -28,6 +30,23 @@ test("fixture outputs validate against published JSON schemas", () => {
   }
 });
 
+test("github action json artifact validates against published github audit schema", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-action-schema-"));
+  const outputPath = path.join(tempDir, "audit.json");
+  const result = spawnSync(
+    process.execPath,
+    ["src/github-action.js", "--root", fixtureRoot, "--json-output", outputPath, "--output-format", "json"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const artifact = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+  assert.deepEqual(validateWithSchema(readSchema("github-audit.schema.json"), artifact), []);
+  assert.equal(artifact.containsSecretValues, false);
+  assert.equal(JSON.stringify(artifact).includes("postgres://"), false);
+  assert.equal(JSON.stringify(artifact).includes("sk_test_secret_value"), false);
+});
+
 function readSchema(name) {
   return JSON.parse(fs.readFileSync(path.join(repoRoot, "schemas", name), "utf8"));
 }
@@ -39,6 +58,17 @@ function validateWithSchema(schema, value) {
 }
 
 function validateNode(schema, value, at, rootSchema, errors) {
+  if (schema.anyOf) {
+    const candidateErrors = schema.anyOf.map((candidate) => {
+      const nestedErrors = [];
+      validateNode(candidate, value, at, rootSchema, nestedErrors);
+      return nestedErrors;
+    });
+    if (candidateErrors.some((nestedErrors) => nestedErrors.length === 0)) return;
+    errors.push(`${at} did not match anyOf: ${candidateErrors.map((nestedErrors) => nestedErrors.join("; ")).join(" | ")}`);
+    return;
+  }
+
   if (schema.$ref) {
     validateNode(resolveRef(rootSchema, schema.$ref), value, at, rootSchema, errors);
     return;

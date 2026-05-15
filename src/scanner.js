@@ -65,7 +65,7 @@ export function scanRepository(rootInput, options = {}) {
     .concat(dynamicUsages.map(dynamicFindingFor))
     .sort(compareFindings);
 
-  return {
+  const report = {
     schemaVersion: REPORT_SCHEMA_VERSION,
     toolVersion: VERSION,
     scanConfigHash: loadedConfig.hash,
@@ -88,6 +88,8 @@ export function scanRepository(rootInput, options = {}) {
     findings,
     warnings
   };
+  enforceOutputLimit(report, scanConfig);
+  return report;
 }
 
 function validateRoot(root) {
@@ -194,9 +196,10 @@ function dynamicFindingFor(source) {
 }
 
 function buildFinding({ kind, severity, variable, message, evidence }) {
-  const idInput = `${REPORT_SCHEMA_VERSION}|${kind}|${variable || ""}|${evidence
-    .map((item) => `${item.kind}:${item.file}:${item.line}:${item.column || ""}:${item.pattern || ""}`)
-    .join("|")}`;
+  const evidenceIdentity = [...new Set(evidence.map((item) => `${item.kind}:${item.file}:${item.pattern || ""}`))]
+    .sort()
+    .join("|");
+  const idInput = `${REPORT_SCHEMA_VERSION}|${kind}|${variable || ""}|${evidenceIdentity}`;
   return {
     id: `fnd_${stableHash(idInput)}`,
     kind,
@@ -205,6 +208,13 @@ function buildFinding({ kind, severity, variable, message, evidence }) {
     message,
     evidence
   };
+}
+
+function enforceOutputLimit(report, scanConfig) {
+  if (!scanConfig.maxOutputBytes) return;
+  const bytes = Buffer.byteLength(JSON.stringify(report), "utf8");
+  if (bytes <= scanConfig.maxOutputBytes) return;
+  throw new Error(`Report exceeds maxOutputBytes=${scanConfig.maxOutputBytes}; narrow the root, include/exclude paths, or raise the limit.`);
 }
 
 function evidenceFrom(sources) {

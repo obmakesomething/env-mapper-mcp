@@ -136,6 +136,41 @@ test("scanner loads mjs config and enforces allowed roots", () => {
   );
 });
 
+test("scanner applies include, exclude, and maxFileBytes to env templates", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, ".env.example"), "EXCLUDED_TEMPLATE_TOKEN=\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "index.js"), "process.env.ACTIVE_SOURCE_TOKEN;\n", "utf8");
+
+  let report = scanRepository(root, {
+    config: writeConfig(root, {
+      include: ["src/**"],
+      exclude: [".env.example"]
+    })
+  });
+  assert.deepEqual(report.variables.map((item) => item.name), ["ACTIVE_SOURCE_TOKEN"]);
+
+  report = scanRepository(root, {
+    config: writeConfig(root, {
+      include: [".env.example"],
+      maxFileBytes: 1
+    })
+  });
+  assert.deepEqual(report.variables.map((item) => item.name), []);
+});
+
+test("scanner enforces maxOutputBytes", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "index.js"), "process.env.ACTIVE_SOURCE_TOKEN;\n", "utf8");
+  const configPath = writeConfig(root, { maxOutputBytes: 1 });
+
+  assert.throws(
+    () => scanRepository(root, { config: configPath }),
+    /exceeds maxOutputBytes=1/
+  );
+});
+
 test("scanner does not treat JS template literals as shell env references", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));
   fs.mkdirSync(path.join(root, "src"));
@@ -150,6 +185,12 @@ test("scanner does not treat JS template literals as shell env references", () =
 
   assert.deepEqual(names, ["REAL_ENV_KEY"]);
 });
+
+function writeConfig(root, config) {
+  const configPath = path.join(root, `.env-mapper-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+  fs.writeFileSync(configPath, JSON.stringify(config), "utf8");
+  return configPath;
+}
 
 test("scanner ignores comments/strings and flags js dynamic env keys for review", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-"));

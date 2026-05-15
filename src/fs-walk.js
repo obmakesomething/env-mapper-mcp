@@ -39,18 +39,19 @@ function walk(root, current, files, scanConfig, warnings) {
 function isScannableFile(filePath, root, scanConfig) {
   const relPath = normalizePath(path.relative(root, filePath));
   const base = path.basename(filePath);
-  if (base.startsWith(".env") && isEnvFile(relPath)) return true;
-  if (base === ".env" || base.startsWith(".env.")) return false;
   if (scanConfig.include?.length && !matchesAny(relPath, scanConfig.include)) return false;
   if (matchesAny(relPath, scanConfig.exclude)) return false;
+  if (base === ".env" || (base.startsWith(".env.") && !isEnvFile(relPath))) return false;
   const ext = path.extname(base);
-  if (!TEXT_EXTENSIONS.has(ext)) return false;
   try {
     const stat = fs.statSync(filePath);
-    return stat.size <= (scanConfig.maxFileBytes || MAX_FILE_BYTES);
+    if (stat.size > (scanConfig.maxFileBytes || MAX_FILE_BYTES)) return false;
   } catch {
     return false;
   }
+  if (base.startsWith(".env") && isEnvFile(relPath)) return true;
+  if (!TEXT_EXTENSIONS.has(ext)) return false;
+  return true;
 }
 
 function matchesAny(relPath, patterns = []) {

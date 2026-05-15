@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
-import { formatGithubAuditMarkdown } from "./format-github.js";
+import { buildGithubAudit, formatGithubAuditMarkdown } from "./format-github.js";
 import { buildDiff } from "./diff.js";
 import { scanRepository } from "./scanner.js";
 
@@ -10,7 +10,13 @@ export function main(argv = process.argv.slice(2), env = process.env) {
   const report = scanRepository(options.root);
   const diff = options.baseline ? buildDiff({ root: options.root, base: options.baseline }) : null;
   const markdown = formatGithubAuditMarkdown(report, { maxFindings: options.maxFindings });
-  const jsonAudit = JSON.stringify({ report, diff, gate: evaluateGate(report, diff, options.failOn) }, null, 2);
+  const gate = evaluateGate(report, diff, options.failOn);
+  const audit = {
+    ...buildGithubAudit(report, { maxFindings: options.maxFindings }),
+    diff,
+    gate
+  };
+  const jsonAudit = JSON.stringify(audit, null, 2);
 
   if (options.output && shouldWriteFormat(options.outputFormat, "markdown")) {
     const outputPath = path.resolve(options.output);
@@ -47,7 +53,6 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     process.stdout.write(markdown);
   }
 
-  const gate = evaluateGate(report, diff, options.failOn);
   if (gate.fail) {
     process.stderr.write(`Env Mapper gate failed: ${gate.reason}\n`);
     return 1;

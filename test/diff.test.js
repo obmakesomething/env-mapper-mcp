@@ -43,6 +43,27 @@ test("diff separates new, resolved, unchanged, classification, and variable chan
   assert.ok(diff.summary.unchangedFindings >= 1);
 });
 
+test("diff does not treat line-only movement as a new finding", () => {
+  const baseRoot = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-base-"));
+  const headRoot = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-head-"));
+  fs.mkdirSync(path.join(baseRoot, "src"));
+  fs.mkdirSync(path.join(headRoot, "src"));
+  fs.writeFileSync(path.join(baseRoot, "src", "index.js"), "process.env.EXISTING_TOKEN;\n", "utf8");
+  fs.writeFileSync(path.join(headRoot, "src", "index.js"), "\nprocess.env.EXISTING_TOKEN;\nprocess.env.EXISTING_TOKEN;\n", "utf8");
+
+  const diff = compareReports(scanRepository(baseRoot), scanRepository(headRoot), {
+    root: headRoot,
+    base: "base.json",
+    head: "head.json"
+  });
+
+  assert.equal(diff.summary.newFindings, 0);
+  assert.equal(diff.summary.resolvedFindings, 0);
+  assert.equal(diff.summary.unchangedFindings, 1);
+  assert.equal(diff.summary.newHighFindings, 0);
+});
+
+
 test("diff cli compares baseline report file to current scan", () => {
   const baseRoot = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-base-"));
   const headRoot = fs.mkdtempSync(path.join(os.tmpdir(), "env-mapper-head-"));

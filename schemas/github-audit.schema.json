@@ -47,7 +47,22 @@
     },
     "containsSecretValues": { "const": false },
     "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
-    "markdown": { "type": "string" }
+    "markdown": { "type": "string" },
+    "diff": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "object" }
+      ]
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fail", "reason"],
+      "properties": {
+        "fail": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    }
   },
   "$defs": {
     "finding": {
