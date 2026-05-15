@@ -1,4 +1,5 @@
 import path from "node:path";
+import { detectJavaScriptAst } from "./js-ast-detector.js";
 
 const KEY = "[A-Z][A-Z0-9_]{1,}";
 
@@ -22,13 +23,14 @@ const REFERENCE_PATTERNS = [
   { name: "github.vars", regex: new RegExp(`\\$\\{\\{\\s*vars\\.(${KEY})\\s*\\}\\}`, "g"), kind: "provider-reference" }
 ];
 
-export function detectFile(filePath, root, text) {
+export function detectFile(filePath, root, text, options = {}) {
   const relPath = path.relative(root, filePath) || path.basename(filePath);
   const lineStarts = computeLineStarts(text);
   const findings = [];
   const dynamicUsages = [];
   const useJsSyntaxMask = isJavaScriptSource(relPath);
   const scanText = useJsSyntaxMask ? maskJavaScriptSource(text) : text;
+  const astResult = useJsSyntaxMask ? detectJavaScriptAst(text, relPath, options) : null;
 
   if (isEnvFile(relPath)) {
     findings.push(...detectEnvDeclarations(text, relPath));
@@ -38,11 +40,16 @@ export function detectFile(filePath, root, text) {
     findings.push(...detectComposeDeclarations(text, relPath));
   }
 
-  for (const pattern of STATIC_CODE_PATTERNS) {
-    collectMatches({ findings, text: scanText, lineStarts, relPath, pattern, kind: "usage" });
+  if (astResult) {
+    findings.push(...astResult.findings);
+    dynamicUsages.push(...astResult.dynamicUsages);
+  } else {
+    for (const pattern of STATIC_CODE_PATTERNS) {
+      collectMatches({ findings, text: scanText, lineStarts, relPath, pattern, kind: "usage" });
+    }
   }
 
-  if (useJsSyntaxMask) {
+  if (useJsSyntaxMask && !astResult) {
     for (const pattern of JS_DYNAMIC_DETECTOR_PATTERNS) {
       collectDynamicEnvAccesses({
         text: scanText,

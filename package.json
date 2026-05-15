@@ -46,5 +46,8 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.29.3"
   }
 }

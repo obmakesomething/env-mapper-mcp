@@ -26,7 +26,7 @@ export function scanRepository(rootInput, options = {}) {
       continue;
     }
     filesScanned += 1;
-    const scanResult = detectFile(filePath, root, text);
+    const scanResult = detectFile(filePath, root, text, scanConfig);
     for (const finding of scanResult.findings) {
       if (!byName.has(finding.name)) byName.set(finding.name, []);
       byName.get(finding.name).push(finding);

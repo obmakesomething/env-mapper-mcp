@@ -56,7 +56,7 @@ Repository:
 
 Implemented baseline:
 
-- zero-dependency Node.js CLI
+- Node.js CLI with AST-backed JS/TS scanning
 - stdio MCP server with focused tool names
 - redacted scanner report
 - DMNO draft generation
